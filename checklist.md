@@ -24,7 +24,7 @@
 |---|---|---|
 | **B** | B2 — QR camera spike | 🔨 *Page built & merged — **only the real-phone HTTPS test is left.** Until that runs, the H20 risk is not actually retired.* |
 | **B** | B3 — booking UI on fixtures | Zero deps; build against JSON fixtures |
-| **C** | C2 — simulator physics (pure fn → stdout) | Zero deps, no DB, no HTTP |
+| **C** | **C2 — simulator physics** | ✅ done — `simulator/src/physics.ts`, merged, never ticked until now |
 | **D** | D2 — `lib/stats.ts` + forecasting | Zero deps, pure functions over arrays |
 | **D** | D3 — anomaly detectors (pure fns) | Zero deps |
 | **B/C/D** | **Anything needing the DB** | ✅ Schema is pushed — `prisma generate` works |
@@ -33,7 +33,8 @@
 | **C** | **C4 — Ingest + rollup** | ✅ `requireApiKey` + `IngestInput` (accepts bare array *or* `{ticks:[]}`) ready |
 | **D** | **D4 — Mailer** | ✅ `Notification` model live · **done, real send verified** |
 | **B** | B5 confirm + QR email | ✅ `sendMail()` is real now — import `services/mailer/service.ts`, no need to stub |
-| **C** | **C7 — asset page charts** | ✅ **Seeded data exists** — 54k ticks, 21 days, real fuel saw-tooth |
+| **C** | **C5 — simulator wired live + scenarios** | ✅ done — `simulator/src/index.ts` + `scenarios.ts`, merged, never ticked until now |
+| **C** | **C7 — asset page charts** | ✅ **Wired to live endpoints now, not fixtures** — see below |
 | **D** | **D5 — detector runner** | ✅ Seeded data has **4 real injected faults** to fire on — done, see below |
 | **D** | **D6 — forecast runner** | ✅ 12 months of demand with trend + seasonality to learn — done, see below |
 | **A** | **A10 — frontend shell + auth pages** | ✅ Login/register + authenticated `(app)` shell (admin, dashboard) landed on `main` |
@@ -48,7 +49,6 @@
 |---|---|
 | A9 real rollup in seed | C4 (rollup service) |
 | B10 phone scanner re-test | A11 (deploy) |
-| C12 asset timeline | ✅ unblocked — D5 anomalies exist now |
 
 ---
 
@@ -262,10 +262,10 @@ truth — `backend/src/contracts/` wins any disagreement.
 # Person C — Simulator, Telemetry & the Asset Page
 
 - [ ] **C1** · H0–H0.75 — Contract workshop
-- [ ] **C2** · H0.75–H2.5 — **Simulator physics as a pure function** ⛔ *no deps* — stdout only. Duty cycle by hour-of-day, `engineHours += 10/60` when not OFF, fuel burn + refuel <12%, temp → 88±6, random walk in site radius, speed 0–4 kph. **Print a day and eyeball it** — fuel should saw-tooth, temp should follow engine state.
+- [x] **C2** · H0.75–H2.5 — **Simulator physics as a pure function** · *done — `simulator/src/physics.ts` + `print-day.ts`, merged in `190b1ee`. Checklist never got ticked for it.*
 - [x] **C3** · H2.5–H3.5 — Chart components on fixtures · *done — `WorkingIdleChart`, `UsageLineChart`, `FuelAreaChart`, `TemperatureLineChart`, `EngineStateRibbon` in `frontend/components/charts/`. D's `ForecastBand` (prediction-interval band, for D9) sits alongside rather than in this set — different shape of chart, no overlap.*
 - [x] **C4** · H3.5–H5 — Ingest + rollup ⛔ *needs A3 ✅* — `POST /api/telemetry/ingest` w/ `x-api-key`, idempotent via `createMany({skipDuplicates:true})` on `@@unique([equipmentId, ts])` *(verified working)*. `services/rollup.ts` upsert on `[equipmentId, date]` *(verified working)*. `POST /api/jobs/rollup` — **now guarded ADMIN-only, it had no auth at all**.
-- [ ] **C5** · H5–H6.5 — Simulator wired live + `--scenario` injectors: `idle`, `dead`, `theft`, `siphon`, `overheat`, `offline`. **`theft` is the money shot.**
+- [x] **C5** · H5–H6.5 — Simulator wired live + `--scenario` injectors · *done — `simulator/src/index.ts` reads `CHECKED_OUT` bookings via `/api/telemetry/active-bookings` and POSTs batches to `/api/telemetry/ingest`; `scenarios.ts` has all six (`idle`/`dead`/`theft`/`siphon`/`overheat`/`offline`), merged in `190b1ee`. Also never ticked. Not independently re-run against the live API in this pass — D12 (threshold tuning against `--scenario theft`) is the real end-to-end check for that.*
 - [x] **C6** · H6.5–H8 — Query endpoints: `/timeseries` with **server-side** `date_trunc` bucketing (`10m|1h|1d`), `/track`, `/summary`, `/daily` — `routes/equipment-analytics.ts`, mounted at `/api/equipment` and `/api/analytics`.
 - [x] **C7** · H8–H11 — `/asset/[assetId]` sections 1–3 · *now wired to C6's real endpoints (summary/daily/timeseries×2/track), not the fixture — `[assetId]` resolves either a real equipment id (the case every in-app link now uses) or a human-typed code (`EXC-1007`) via a fallback search. `days`/`bucket` controls actually refetch now, they didn't before. Restyled to the app's own design system (was plain zinc/white Tailwind, visually a different app from the rest). Still not linked from `nav-config.ts` — reached via the admin dashboard's "requires attention" links, not top-level nav.*
 - [x] **C8** · H11–H12.5 — Leaflet map (section 4) — `AssetMap`/`AssetMapInner` render the real GPS track/geofence now that C7 feeds them live data; restyled to match.
