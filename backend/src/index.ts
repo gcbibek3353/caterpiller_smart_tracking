@@ -10,6 +10,7 @@ import { authRoutes } from "./routes/auth";
 import { equipmentRoutes } from "./routes/equipment";
 import { siteRoutes } from "./routes/sites";
 import { operatorRoutes } from "./routes/operators";
+import { bookingRoutes } from "./routes/bookings";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -54,7 +55,7 @@ app.route("/api/auth", authRoutes); // A5 ✅
 app.route("/api/equipment", equipmentRoutes); // A7 ✅
 app.route("/api/sites", siteRoutes); // A7 ✅
 app.route("/api/operators", operatorRoutes); // A7 ✅
-// app.route("/api/bookings",  bookingRoutes);    // B4
+app.route("/api/bookings", bookingRoutes); // B4 ✅
 // app.route("/api/scan",      scanRoutes);       // B6
 // app.route("/api/telemetry", telemetryRoutes);  // C4
 // app.route("/api/anomalies", anomalyRoutes);    // D5
