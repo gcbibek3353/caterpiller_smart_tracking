@@ -174,7 +174,8 @@ model Site {
   clientId     String
   client       User    @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  bookings Booking[]
+  bookings        Booking[]
+  demandForecasts DemandForecast[]
 
   @@index([clientId])
 }
@@ -250,6 +251,7 @@ model Booking {
 
   @@index([clientId, status])
   @@index([equipmentId, startDate, endDate])
+  @@index([siteId, startDate, endDate]) // per-site demand series (forecast)
   @@index([status, endDate]) // powers overdue + upcoming-return jobs
 }
 
@@ -369,6 +371,8 @@ model Notification {
 model DemandForecast {
   id            String        @id @default(cuid())
   equipmentType EquipmentType
+  /// null = company-wide aggregate (ignores site entirely), not "no site data yet".
+  siteId        String?
   periodStart   DateTime      @db.Date // Monday of forecast week
   horizonWeek   Int // 1..8 weeks ahead
   predicted     Float // rental-days demanded
@@ -378,10 +382,17 @@ model DemandForecast {
   capacity      Float // fleetSize * 7
   utilization   Float // predicted / capacity
   gapUnits      Float // shortage(+) / surplus(-) in units
-  model         String // "holt-winters" | "seasonal-naive"
+  model         String // "holt-winters" | "seasonal-naive" | "gbm-lag"
   mase          Float? // backtest score
+  /// Under the minimum-history threshold — model fell back to seasonal-naive
+  /// (or all-zero) rather than an honest backtested pick. Existing rows before
+  /// this column existed default to false, which is the pre-existing behavior
+  /// (the runner never persisted this signal at all until now).
+  lowConfidence Boolean       @default(false)
   generatedAt   DateTime      @default(now())
 
-  @@unique([equipmentType, periodStart, generatedAt])
-  @@index([equipmentType, periodStart])
+  site Site? @relation(fields: [siteId], references: [id])
+
+  @@unique([equipmentType, siteId, periodStart, generatedAt])
+  @@index([equipmentType, siteId, periodStart])
 }
