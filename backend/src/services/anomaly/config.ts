@@ -53,6 +53,12 @@ export const ANOMALY_CONFIG = {
     maxGapMinutes: 60,
   },
   overdue: {
+    // `Booking.endDate` is midnight UTC of the last rental day, inclusive —
+    // the client has the whole day to return it (checklist.md: "the seed
+    // follows the inclusive reading"). Without this grace day, `now > endDate`
+    // fires at 00:01 on the return day itself, before the machine could
+    // possibly be back yet, and every active rental reads as overdue.
+    graceDays: 1,
     highSeverityAfterHours: 48,
   },
   upcomingReturn: {

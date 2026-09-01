@@ -57,7 +57,8 @@ export type Env = typeof env;
 
 /**
  * Function form of `env`, for the modules written against it
- * (`src/app.ts`, `middleware/ingest-auth.ts`, `backend/index.ts`).
+ * (`middleware/ingest-auth.ts`, `backend/index.ts` — `src/app.ts` was
+ * deleted, its routes mounted straight into `src/index.ts` instead).
  *
  * The schema is parsed once at module load, so this is a plain accessor and not
  * a re-parse. Both forms are supported deliberately: renaming either one would

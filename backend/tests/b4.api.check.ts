@@ -5,7 +5,7 @@
  *   Part 2 · HTTP + RBAC + persistence — needs the API and Postgres:
  *
  *       Terminal 1:  bun run db:up && bun run db:push && bun run dev
- *       Terminal 2:  bun tests/b4.api.test.ts
+ *       Terminal 2:  bun run test:api:b4
  *
  *   Part 2 skips itself with instructions if the API is not reachable, so this
  *   file is useful before Postgres is running and complete once it is.
@@ -13,9 +13,16 @@
  * ⚠️  Part 2 is DESTRUCTIVE: it truncates users, equipment, sites, operators
  * and bookings. Local dev database only.
  *
- * The boundary cases in Part 1 mirror the availability cases in a7.api.test.ts
+ * The boundary cases in Part 1 mirror the availability cases in a7.api.check.ts
  * on purpose. The catalogue filter and this endpoint must agree on what
  * "overlaps" means, or the UI offers a machine that POST /api/bookings refuses.
+ *
+ * Named `.check.ts`, not `.test.ts`, ON PURPOSE — same reason as
+ * a7.api.check.ts: it's a standalone script (top-level `process.exit()`, no
+ * `test()`/`describe()`), not a bun:test suite, and it TRUNCATEs real tables.
+ * Confirmed this file getting swept up by a plain `bun test` truncates
+ * whatever `DATABASE_URL` points at — including a live/shared dev DB, not
+ * just an empty local one. Keep it out of the `*.test.ts` glob.
  */
 
 // env.ts process.exit(1)s on missing vars. These are placeholders so the module
@@ -103,41 +110,47 @@ check("PATCH still sees OTHER bookings", collides("2026-09-12", "2026-09-15", "s
 // ─────────────────────────────────────────────────────────────────────
 // Part 2 · HTTP, RBAC, persistence
 // ─────────────────────────────────────────────────────────────────────
-// Set by scripts/with-test-db.ts, which also swaps DATABASE_URL for
-// TEST_DATABASE_URL and moves the server to :4001. Defaulting to :4000 keeps a
-// bare `bun tests/b4.api.test.ts` working against a plain `bun run dev`.
+// Set by scripts/with-test-db.ts, which swaps DATABASE_URL for
+// TEST_DATABASE_URL and runs the test stack on 4001, so it cannot collide with
+// a `bun run dev` server already holding 4000 against Neon.
 const API = process.env.API_URL ?? "http://localhost:4000";
 const ORIGIN = "http://localhost:3000";
-
-/**
- * Hard stop before the TRUNCATE below.
- *
- * DATABASE_URL normally points at the shared Neon database — four people's live
- * working data and A8's seed. Truncating it deletes their fixtures and logs the
- * whole team out. Run this suite through `bun run test:b4`, which routes
- * DATABASE_URL to local Docker via scripts/with-test-db.ts.
- *
- * Checked here rather than left to discipline: the failure is silent, instant
- * and unrecoverable without the snapshot.
- */
-const dbHost = (() => {
-  try { return new URL(process.env.DATABASE_URL ?? "").hostname; } catch { return ""; }
-})();
-if (!["localhost", "127.0.0.1", "::1"].includes(dbHost)) {
-  console.error(`\n✘ REFUSING TO RUN — DATABASE_URL points at "${dbHost || "unparseable"}".`);
-  console.error("  This suite TRUNCATEs user, session, Equipment, Site, Operator and Booking.");
-  console.error("  Run it against local Docker instead:\n");
-  console.error("      bun run db:up && bun run test:b4\n");
-  console.error(`  (Part 1 passed: ${pass} assertions, no database touched.)`);
-  process.exit(fail === 0 ? 0 : 1);
-}
 
 const reachable = await fetch(`${API}/health`).then((r) => r.ok).catch(() => false);
 if (!reachable) {
   console.log("\n── HTTP tests SKIPPED — API not reachable at " + API + " ──");
-  console.log("   bun run db:up && bun run db:push && bun run dev\n");
+  console.log("   bun run db:up && bun run dev:test\n");
   console.log(`${pass} passed, ${fail} failed  (Part 1 only)`);
   process.exit(fail === 0 ? 0 : 1);
+}
+
+/**
+ * Refuse to truncate anything that is not local Postgres — same guard as
+ * a7.api.check.ts, and the same reason: this file TRUNCATEs, the team shares
+ * one Neon database, and `bun tests/b4.api.check.ts` run directly (bypassing
+ * `bun run test:api:b4` / scripts/with-test-db.ts) is a real path that has
+ * actually hit the shared DB, not just a hypothetical one.
+ */
+{
+  const raw = process.env.DATABASE_URL ?? "";
+  const host = raw ? new URL(raw).hostname : "";
+  const local = ["localhost", "127.0.0.1", "::1"].includes(host);
+  if (!local && process.env.ALLOW_REMOTE_TRUNCATE !== "1") {
+    console.error(`
+✘ REFUSING TO RUN — this suite TRUNCATEs, and DATABASE_URL points at "${host}".
+
+  That is the shared database. Running here would log the whole team out and
+  delete their data.
+
+  Run it against local Postgres instead:
+      bun run db:up
+      bun run dev:test        # terminal 1 — server on the test database
+      bun run test:api:b4     # terminal 2
+
+  If you genuinely mean to wipe a remote database, set ALLOW_REMOTE_TRUNCATE=1.
+`);
+    process.exit(1);
+  }
 }
 
 const { prisma } = await import("../src/db.ts");

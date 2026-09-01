@@ -7,7 +7,9 @@ import {
   getClientBookingWindow,
   type AuthUser,
 } from "../lib/equipment-access";
-import { BUCKET_SIZES, TIMESERIES_METRICS } from "@rental/shared";
+import { optionalAuth } from "../middleware/auth";
+import type { AppEnv } from "../types";
+import { BUCKET_SIZES, TIMESERIES_METRICS } from "../shared";
 
 const querySchema = z.object({
   from: z.string().datetime().optional(),
@@ -21,7 +23,10 @@ const dateRangeSchema = z.object({
   to: z.string().optional(),
 });
 
-export const equipmentAnalytics = new Hono();
+export const equipmentAnalytics = new Hono<AppEnv>();
+// Replaces app.ts's old "dev stub auth" comment — real better-auth session,
+// populated opportunistically; guardEquipmentAccess() below does the 401/403.
+equipmentAnalytics.use("*", optionalAuth);
 
 async function guardEquipmentAccess(
   c: { get: (k: string) => unknown; json: (body: unknown, status?: number) => Response },
@@ -321,7 +326,8 @@ function round(n: number, d = 2) {
 }
 
 /** Fleet analytics for admin dashboard */
-export const fleetAnalytics = new Hono();
+export const fleetAnalytics = new Hono<AppEnv>();
+fleetAnalytics.use("*", optionalAuth);
 
 fleetAnalytics.get("/fleet", async (c) => {
   const user = c.get("user") as AuthUser | undefined;
