@@ -1,4 +1,4 @@
-import type { EngineState, Scenario } from "@rental/shared";
+import type { EngineState, Scenario } from "../../src/shared";
 
 export interface SiteConfig {
   lat: number;

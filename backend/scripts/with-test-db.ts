@@ -34,8 +34,23 @@ const api = `http://localhost:${port}`;
 
 console.log(`↪ DATABASE_URL → ${new URL(url).host} · port ${port} (test stack)`);
 
+/**
+ * MAIL_MODE is forced to console for the same reason DATABASE_URL is swapped.
+ * The team runs MAIL_MODE=resend with a live key, and the suites sign up
+ * fabricated clients (c1@b.com); confirming a booking then sends a real email
+ * to an address that does not exist. That burns Resend quota and accumulates
+ * bounces against the sending domain on every test run.
+ */
 const proc = Bun.spawn(argv, {
-  env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url, PORT: port, API_URL: api },
+  env: {
+    ...process.env,
+    DATABASE_URL: url,
+    DIRECT_URL: url,
+    PORT: port,
+    API_URL: api,
+    MAIL_MODE: "console",
+    RESEND_API_KEY: "",
+  },
   stdout: "inherit",
   stderr: "inherit",
   stdin: "inherit",

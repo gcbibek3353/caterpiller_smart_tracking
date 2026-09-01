@@ -1,5 +1,5 @@
-import { dutyCycleState } from "@rental/shared";
-import type { EngineState } from "@rental/shared";
+import { dutyCycleState } from "../../src/shared";
+import type { EngineState } from "../../src/shared";
 import { createRng, type Rng } from "./rng";
 import type {
   SimulatorConfig,
@@ -158,12 +158,12 @@ function hashString(s: string): number {
 }
 
 export interface SimulateOptions {
-  scenario?: import("@rental/shared").Scenario;
+  scenario?: import("../../src/shared").Scenario;
   scenarioState?: ScenarioRuntime;
 }
 
 export interface ScenarioRuntime {
-  type?: import("@rental/shared").Scenario;
+  type?: import("../../src/shared").Scenario;
   theftTriggered?: boolean;
   theftBearing?: number;
   offlineUntil?: Date;

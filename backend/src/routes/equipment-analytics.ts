@@ -9,7 +9,7 @@ import {
 } from "../lib/equipment-access";
 import { optionalAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
-import { BUCKET_SIZES, TIMESERIES_METRICS } from "@rental/shared";
+import { BUCKET_SIZES, TIMESERIES_METRICS } from "../shared";
 
 const querySchema = z.object({
   from: z.string().datetime().optional(),

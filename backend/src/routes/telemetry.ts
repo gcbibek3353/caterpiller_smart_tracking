@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { TelemetryIngestRequestSchema } from "@rental/shared";
+import { TelemetryIngestRequestSchema } from "../shared";
 import { prisma } from "../db";
 import { requireIngestApiKey } from "../middleware/ingest-auth";
 import { rollupTelemetry } from "../services/rollup";
