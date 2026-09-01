@@ -5,7 +5,19 @@
   "private": true,
   "scripts": {
     "dev": "bun run --hot index.ts",
-    "start": "bun run index.ts"
+    "start": "bun run index.ts",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:push": "prisma db push",
+    "db:reset": "prisma db push --force-reset",
+    "db:studio": "prisma studio",
+    "generate": "prisma generate",
+    "seed": "bun prisma/seed.ts",
+    "test:api": "bun tests/a7.api.test.ts",
+    "seed:fresh": "prisma db push --force-reset --skip-generate && bun prisma/seed.ts",
+    "seed:verify": "bun tests/seed.verify.ts",
+    "db:dump": "docker exec rental-postgres pg_dump -U rental -d rental --clean --if-exists > prisma/snapshot.sql",
+    "db:restore": "docker exec -i rental-postgres psql -U rental -d rental < prisma/snapshot.sql"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.3",
