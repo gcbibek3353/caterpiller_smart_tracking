@@ -6,7 +6,12 @@ import { badRequest, conflict, notFound, ok } from "../lib/http";
 import { paginated, serializeBooking } from "../lib/serialize";
 import { assertCanSeeBooking, requireAuth } from "../middleware/auth";
 import { valid, validate } from "../middleware/validate";
-import { BookingListQuery, CreateBookingInput, IdParam } from "../contracts";
+import {
+  BookingListQuery,
+  CreateBookingInput,
+  IdParam,
+  UpdateBookingInput,
+} from "../contracts";
 import type { AppEnv, SessionUser } from "../types";
 
 export const bookingRoutes = new Hono<AppEnv>();
@@ -233,3 +238,127 @@ bookingRoutes.get("/", validate("query", BookingListQuery), async (c) => {
   const items = rows.map(({ qrToken: _qrToken, ...b }) => serializeBooking(b));
   return ok(c, paginated(items, total, q.page, q.limit));
 });
+
+/** Fields the response may carry. `qrToken` is stripped on every path. */
+const bookingInclude = {
+  equipment: {
+    select: {
+      id: true, code: true, name: true, type: true, imageUrl: true,
+      make: true, model: true, year: true, status: true,
+    },
+  },
+  client: { select: { id: true, name: true, companyName: true, email: true, phone: true } },
+  site: { select: { id: true, name: true, lat: true, lng: true, radiusMeters: true } },
+  operator: { select: { id: true, name: true, phone: true } },
+} satisfies Prisma.BookingInclude;
+
+// ── GET /api/bookings/:id ─────────────────────────────────────────────
+bookingRoutes.get("/:id", validate("param", IdParam), async (c) => {
+  const { id } = valid(c, "param", IdParam);
+  const user = c.get("user");
+
+  // Ownership guard first: 403s for another client's booking, and for a missing
+  // one too, so the endpoint cannot be used to probe which ids exist.
+  await assertCanSeeBooking(user, id);
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: bookingInclude });
+  if (!booking) throw notFound("Booking");
+
+  const { qrToken: _qrToken, ...safe } = booking;
+  return ok(c, {
+    ...serializeBooking(safe),
+    isOverdue: booking.status === "CHECKED_OUT" && booking.endDate < new Date(),
+  });
+});
+
+/**
+ * Statuses that can still be cancelled.
+ *
+ * steps.md §5 draws the cancel arrow from CHECKED_OUT as well, but cancelling a
+ * machine that is physically out would leave Equipment.status stuck at
+ * CHECKED_OUT with no booking to check in against. That one is deliberately
+ * refused here and pointed at the check-in scan instead — worth confirming with
+ * A/B before B8 builds the admin cancel button.
+ */
+const CANCELLABLE: Prisma.BookingWhereInput["status"] = { in: ["PENDING", "CONFIRMED"] };
+
+// ── PATCH /api/bookings/:id ───────────────────────────────────────────
+bookingRoutes.patch(
+  "/:id",
+  validate("param", IdParam),
+  validate("json", UpdateBookingInput),
+  async (c) => {
+    const { id } = valid(c, "param", IdParam);
+    const body = valid(c, "json", UpdateBookingInput);
+    const user = c.get("user");
+
+    const existing = await assertCanSeeBooking(user, id);
+
+    /**
+     * A CLIENT may cancel their own booking and nothing else. Re-dating or
+     * assigning a site/operator changes what gets billed and who is dispatched,
+     * so it stays with ADMIN (B8 owns that UI).
+     */
+    if (user.role !== "ADMIN") {
+      const touched = Object.keys(body);
+      const onlyCancelling = touched.length === 1 && body.status === "CANCELLED";
+      if (!onlyCancelling) {
+        throw badRequest("Clients may only cancel a booking; ask an admin to change its details");
+      }
+    }
+
+    if (existing.status === "RETURNED" || existing.status === "CANCELLED") {
+      throw conflict(`This booking is already ${existing.status.toLowerCase()} and cannot be changed`);
+    }
+
+    if (body.status === "CANCELLED") {
+      const cancellable = (CANCELLABLE as { in: string[] }).in;
+      if (!cancellable.includes(existing.status)) {
+        throw conflict(
+          `A ${existing.status} booking cannot be cancelled — check the machine back in instead`,
+        );
+      }
+    }
+
+    const data: Prisma.BookingUpdateInput = {};
+    if (body.status) data.status = body.status;
+    if (body.siteId !== undefined) {
+      if (body.siteId && !(await prisma.site.findUnique({ where: { id: body.siteId } }))) {
+        throw notFound("Site");
+      }
+      data.site = body.siteId ? { connect: { id: body.siteId } } : { disconnect: true };
+    }
+    if (body.operatorId !== undefined) {
+      if (body.operatorId && !(await prisma.operator.findUnique({ where: { id: body.operatorId } }))) {
+        throw notFound("Operator");
+      }
+      data.operator = body.operatorId ? { connect: { id: body.operatorId } } : { disconnect: true };
+    }
+
+    // Extending a hire can collide with the NEXT booking on the same machine,
+    // so a date change re-runs the overlap check — excluding this row, which
+    // would otherwise always conflict with itself.
+    if (body.endDate) {
+      if (body.endDate <= existing.startDate) {
+        throw badRequest("endDate must be after startDate");
+      }
+      const clash = await prisma.booking.findFirst({
+        where: overlapWhere(existing.equipmentId, existing.startDate, body.endDate, id),
+        select: { id: true, code: true, startDate: true, endDate: true },
+        orderBy: { startDate: "asc" },
+      });
+      if (clash) {
+        throw conflict(
+          `Cannot extend to ${body.endDate.toISOString().slice(0, 10)}: booking ${clash.code} ` +
+            `starts ${clash.startDate.toISOString().slice(0, 10)} on this machine.`,
+          { conflictingBooking: clash },
+        );
+      }
+      data.endDate = body.endDate;
+    }
+
+    const updated = await prisma.booking.update({ where: { id }, data, include: bookingInclude });
+    const { qrToken: _qrToken, ...safe } = updated;
+    return ok(c, serializeBooking(safe));
+  },
+);
