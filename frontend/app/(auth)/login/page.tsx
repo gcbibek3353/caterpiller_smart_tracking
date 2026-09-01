@@ -44,11 +44,11 @@ function LoginForm() {
       <div className="hazard h-1.5 rounded-t-plate" />
 
       <div className="px-7 pb-7 pt-6">
-        <p className="stamp text-[10px] text-hivis">Smart Rental Tracking</p>
-        <h1 className="font-display mt-1 text-4xl font-bold uppercase leading-none tracking-tight">
+        <p className="stamp text-stamp-sm text-hivis">Smart Rental Tracking</p>
+        <h1 className="font-display mt-1 text-title font-bold uppercase leading-none tracking-tight">
           Sign in to the yard
         </h1>
-        <p className="mt-2 text-sm text-steel">
+        <p className="mt-2 text-body text-steel">
           Book machines, scan them out, and watch them work.
         </p>
 
@@ -74,7 +74,7 @@ function LoginForm() {
           />
 
           {error ? (
-            <p role="alert" className="border-l-2 border-alert bg-alert/6 px-3 py-2 text-[13px] text-alert">
+            <p role="alert" className="border-l-2 border-alert bg-alert/6 px-3 py-2 text-note text-alert">
               {error}
             </p>
           ) : null}
@@ -84,7 +84,7 @@ function LoginForm() {
           </Button>
         </form>
 
-        <p className="mt-6 text-[13px] text-steel">
+        <p className="mt-6 text-note text-steel">
           Renting for the first time?{" "}
           <Link href="/register" className="text-ink underline decoration-hivis decoration-2 underline-offset-4">
             Create a client account
@@ -94,9 +94,9 @@ function LoginForm() {
 
       {/* Demo credentials — remove before this is a real product. */}
       <div className="border-t border-line bg-dust/60 px-7 py-3">
-        <p className="stamp text-[9px] text-mute">Demo logins</p>
-        <p className="mt-1 font-mono text-[11px] text-steel">admin@rental.com · admin123</p>
-        <p className="font-mono text-[11px] text-steel">client@build.com · client123</p>
+        <p className="stamp text-stamp-xs text-mute">Demo logins</p>
+        <p className="mt-1 font-mono text-stamp text-steel">admin@rental.com · admin123</p>
+        <p className="font-mono text-stamp text-steel">client@build.com · client123</p>
       </div>
     </div>
   );
@@ -104,7 +104,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<p className="stamp text-[11px] text-mute">Loading…</p>}>
+    <Suspense fallback={<p className="stamp text-stamp text-mute">Loading…</p>}>
       <LoginForm />
     </Suspense>
   );

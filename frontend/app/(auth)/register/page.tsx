@@ -48,11 +48,11 @@ export default function RegisterPage() {
     <div className="rounded-plate border border-line bg-plate">
       <div className="hazard h-1.5 rounded-t-plate" />
       <div className="px-7 pb-7 pt-6">
-        <p className="stamp text-[10px] text-hivis">Smart Rental Tracking</p>
-        <h1 className="font-display mt-1 text-4xl font-bold uppercase leading-none tracking-tight">
+        <p className="stamp text-stamp-sm text-hivis">Smart Rental Tracking</p>
+        <h1 className="font-display mt-1 text-title font-bold uppercase leading-none tracking-tight">
           Open a client account
         </h1>
-        <p className="mt-2 text-sm text-steel">
+        <p className="mt-2 text-body text-steel">
           Then browse the fleet and reserve what your site needs.
         </p>
 
@@ -64,7 +64,7 @@ export default function RegisterPage() {
           <Field label="Phone" name="phone" value={form.phone} onChange={set("phone")} placeholder="+977-9801000001" />
 
           {error ? (
-            <p role="alert" className="border-l-2 border-alert bg-alert/6 px-3 py-2 text-[13px] text-alert">
+            <p role="alert" className="border-l-2 border-alert bg-alert/6 px-3 py-2 text-note text-alert">
               {error}
             </p>
           ) : null}
@@ -74,7 +74,7 @@ export default function RegisterPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-[13px] text-steel">
+        <p className="mt-6 text-note text-steel">
           Already have one?{" "}
           <Link href="/login" className="text-ink underline decoration-hivis decoration-2 underline-offset-4">
             Sign in

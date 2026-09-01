@@ -183,46 +183,54 @@ equipmentAnalytics.get("/:id/timeseries", async (c) => {
     ? new Date(Math.min(toDate.getTime(), window.endDate.getTime()))
     : toDate;
 
-  const truncInterval =
-    bucket === "10m" ? "10 minutes" : bucket === "1h" ? "1 hour" : "1 day";
+  /**
+   * `bucket` and `metric` are interpolated, not bound — deliberately.
+   *
+   * Both are zod enums, so the only values that reach here are the literals
+   * below; there is no injection surface. Binding them instead is what broke:
+   * `date_trunc($1, …)` plus an `AVG(CASE WHEN $5 = … )` column switch leaves
+   * the result type dependent on a parameter, and against Neon's pooler that
+   * surfaces as `ERROR: cached plan must not change result type` on the second
+   * distinct metric. Only the actual data values are bound.
+   */
+  /**
+   * `date_bin`, not `date_trunc` — `date_trunc` only takes a field name
+   * ('hour', 'day'), so it cannot express a 10-minute stride at all. `date_bin`
+   * buckets to an arbitrary interval from a fixed origin, which is exactly the
+   * tick cadence the simulator emits on.
+   */
+  const stride: Record<typeof bucket, string> = {
+    "10m": "10 minutes",
+    "1h": "1 hour",
+    "1d": "1 day",
+  };
 
-  const valueColumn =
-    metric === "fuel"
-      ? "fuel_pct"
-      : metric === "temp"
-        ? "engine_temp_c"
-        : metric === "engineHours"
-          ? "engine_hours"
-          : metric === "speed"
-            ? "speed_kph"
-            : "engine_state_ord";
+  const valueExpr: Record<typeof metric, string> = {
+    fuel: '"fuelPct"',
+    temp: '"engineTempC"',
+    engineHours: '"engineHours"',
+    speed: '"speedKph"',
+    engineState: `CASE "engineState" WHEN 'OFF' THEN 0 WHEN 'IDLE' THEN 1 ELSE 2 END`,
+  };
 
   const rows = await prisma.$queryRawUnsafe<
     Array<{ bucket: Date; value: number; engine_state: string | null }>
   >(
     `
     SELECT
-      date_trunc($1, ts AT TIME ZONE 'UTC') AS bucket,
-      AVG(CASE
-        WHEN $5 = 'fuel_pct' THEN "fuelPct"
-        WHEN $5 = 'engine_temp_c' THEN "engineTempC"
-        WHEN $5 = 'engine_hours' THEN "engineHours"
-        WHEN $5 = 'speed_kph' THEN "speedKph"
-        ELSE CASE "engineState" WHEN 'OFF' THEN 0 WHEN 'IDLE' THEN 1 ELSE 2 END
-      END)::float AS value,
+      date_bin('${stride[bucket]}', ts AT TIME ZONE 'UTC', TIMESTAMP '2000-01-01') AS bucket,
+      AVG(${valueExpr[metric]})::float AS value,
       mode() WITHIN GROUP (ORDER BY "engineState") AS engine_state
     FROM "Telemetry"
-    WHERE "equipmentId" = $2
-      AND ts >= $3
-      AND ts <= $4
+    WHERE "equipmentId" = $1
+      AND ts >= $2
+      AND ts <= $3
     GROUP BY bucket
     ORDER BY bucket ASC
     `,
-    truncInterval,
     equipmentId,
     effectiveFrom,
     effectiveTo,
-    valueColumn,
   );
 
   const data = rows.map((r) => ({
@@ -316,6 +324,56 @@ equipmentAnalytics.get("/:id/daily", async (c) => {
       fuelUsedPct: r.fuelUsedPct,
       avgTempC: r.avgTempC,
       distanceKm: r.distanceKm,
+    })),
+  });
+});
+
+/**
+ * C12 — check-out / check-in events for the asset timeline.
+ *
+ * The timeline interleaves these with D5's anomalies, which the page fetches
+ * separately from `/api/anomalies?equipmentId=` (already role-scoped there).
+ * Same booking-window clamp as the rest of this router: a CLIENT sees only
+ * events inside their own rental, enforced here rather than in the UI.
+ */
+equipmentAnalytics.get("/:id/events", async (c) => {
+  const equipmentId = c.req.param("id");
+  if (!(await guardEquipmentAccess(c, equipmentId))) return;
+
+  const user = c.get("user") as AuthUser;
+  const { fromDate, toDate } = parseDateRange(c.req.query("from"), c.req.query("to"), 21);
+
+  const window = await getClientBookingWindow(user, equipmentId);
+  const effectiveFrom = window
+    ? new Date(Math.max(fromDate.getTime(), window.startDate.getTime()))
+    : fromDate;
+  const effectiveTo = window
+    ? new Date(Math.min(toDate.getTime(), window.endDate.getTime()))
+    : toDate;
+
+  const events = await prisma.checkEvent.findMany({
+    where: {
+      booking: { equipmentId },
+      at: { gte: effectiveFrom, lte: effectiveTo },
+    },
+    orderBy: { at: "desc" },
+    take: 100,
+    include: {
+      booking: { select: { code: true } },
+      scannedBy: { select: { name: true } },
+    },
+  });
+
+  return c.json({
+    data: events.map((e) => ({
+      id: e.id,
+      type: e.type,
+      at: e.at.toISOString(),
+      bookingCode: e.booking.code,
+      scannedBy: e.scannedBy.name,
+      meterHours: e.meterHours,
+      fuelPct: e.fuelPct,
+      conditionNotes: e.conditionNotes,
     })),
   });
 });

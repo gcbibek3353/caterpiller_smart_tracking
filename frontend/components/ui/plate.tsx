@@ -23,15 +23,15 @@ export function Plate({
 }) {
   return (
     <section
-      className={`rounded-plate border border-line bg-plate shadow-[0_1px_0_0_rgba(0,0,0,0.06)] ${className}`}
+      className={`rounded-plate border border-line bg-plate shadow-plate ${className}`}
     >
       <header
         className={`flex items-center justify-between gap-3 px-4 py-2 ${
           tone === "hivis" ? "bg-hivis text-ink" : "bg-ink text-dust"
         }`}
       >
-        <h2 className="stamp text-[11px] leading-none">{title}</h2>
-        {meta ? <div className="stamp text-[11px] leading-none opacity-70">{meta}</div> : null}
+        <h2 className="stamp text-stamp leading-none">{title}</h2>
+        {meta ? <div className="stamp text-stamp leading-none opacity-70">{meta}</div> : null}
       </header>
       <div className="p-4">{children}</div>
     </section>
@@ -50,8 +50,8 @@ export function PlateRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-line/60 py-2 last:border-0">
-      <dt className="stamp shrink-0 text-[10px] text-mute">{label}</dt>
-      <dd className={`text-right text-sm text-ink ${mono ? "font-mono" : ""}`}>{value}</dd>
+      <dt className="stamp shrink-0 text-stamp-sm text-mute">{label}</dt>
+      <dd className={`text-right text-data text-ink ${mono ? "font-mono" : ""}`}>{value}</dd>
     </div>
   );
 }

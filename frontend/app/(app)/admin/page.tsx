@@ -1,147 +1,197 @@
 "use client";
 
 import Link from "next/link";
-import fleetFixture from "@/fixtures/fleet-dashboard.json";
-import type { FleetDashboardData } from "@/types/asset";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { StatusBar } from "@/components/charts";
+import { Plate, PlateRow, PlateRows } from "@/components/ui/plate";
+import { StatusPill } from "@/components/ui/status";
+import { formatCurrency, formatDateTime } from "@/lib/design-system";
+import type { Anomaly, Equipment, Paginated } from "@/lib/types";
+import type { FleetAnalytics } from "@/types/asset";
+import { useApi } from "@/lib/use-api";
 
-const data = fleetFixture as FleetDashboardData;
+/**
+ * C11 — the fleet overview, on C6's real `/api/analytics/fleet` aggregate.
+ *
+ * Five headline numbers get stat tiles rather than a chart: they carry
+ * different units and a grouped bar of them would be unreadable. The only
+ * actual chart here is the status mix, which is genuinely part-to-whole.
+ */
+export default function FleetOverview() {
+  const fleet = useApi<FleetAnalytics>("/api/analytics/fleet");
+  const open = useApi<Paginated<Anomaly>>("/api/anomalies", {
+    status: "OPEN",
+    limit: 6,
+  });
+  const out = useApi<Paginated<Equipment>>("/api/equipment", {
+    status: "CHECKED_OUT",
+    limit: 6,
+  });
 
-const STATUS_COLORS: Record<string, string> = {
-  CHECKED_OUT: "#22c55e",
-  AVAILABLE: "#3b82f6",
-  MAINTENANCE: "#f97316",
-  RESERVED: "#a855f7",
-  RETIRED: "#94a3b8",
-};
-
-const SEVERITY_STYLES = {
-  HIGH: "border-red-200 bg-red-50",
-  MEDIUM: "border-orange-200 bg-orange-50",
-  LOW: "border-yellow-200 bg-yellow-50",
-};
-
-function KpiCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p>
-      <p className={`mt-2 text-3xl font-bold ${accent ?? "text-zinc-900"}`}>{value}</p>
-    </div>
-  );
-}
-
-export default function AdminDashboardPage() {
-  const donutData = data.statusDistribution
-    .filter((s) => s.status !== "RETIRED")
-    .map((s) => ({
-      name: s.status.replace("_", " "),
-      value: s.count,
-      fill: STATUS_COLORS[s.status] ?? "#94a3b8",
-    }));
-
-  const revenueFormatted = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(data.revenue);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900">Fleet Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Operational overview — what requires attention right now
+  if (fleet.error) {
+    return (
+      <>
+        <PageHeader />
+        <p className="border-l-2 border-alert bg-alert/6 px-4 py-3 text-note text-alert">
+          {fleet.error.message}
         </p>
-      </div>
+      </>
+    );
+  }
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          label="Fleet Utilization"
-          value={`${data.fleetUtilizationPct}%`}
-          accent="text-green-700"
+  const f = fleet.data;
+
+  return (
+    <>
+      <PageHeader />
+
+      {/* ── headline numbers ─────────────────────────────────────────── */}
+      <div className="mb-5 grid grid-cols-2 gap-px overflow-hidden rounded-plate border border-line bg-line lg:grid-cols-5">
+        <Stat
+          label="Fleet utilisation"
+          value={f ? String(Math.round(f.fleetUtilizationPct)) : "—"}
+          unit="%"
+          note="working ÷ engine hrs, 30d"
         />
-        <KpiCard label="Machines Out" value={String(data.machinesOut)} accent="text-blue-700" />
-        <KpiCard
+        <Stat
+          label="Machines out"
+          value={f ? String(f.machinesOut) : "—"}
+          note={f ? `of ${f.totalMachines} in fleet` : undefined}
+        />
+        <Stat
           label="Overdue"
-          value={String(data.overdueCount)}
-          accent={data.overdueCount > 0 ? "text-red-600" : undefined}
+          value={f ? String(f.overdueCount) : "—"}
+          note="past return date"
+          alert={Boolean(f && f.overdueCount > 0)}
         />
-        <KpiCard label="Revenue (YTD)" value={revenueFormatted} />
+        <Stat label="Available" value={f ? String(f.availableCount) : "—"} note="ready to book" />
+        <Stat
+          label="Revenue"
+          value={f ? formatCurrency(f.revenue) : "—"}
+          note="returned bookings"
+        />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm lg:col-span-2">
-          <h2 className="mb-4 text-sm font-semibold text-zinc-800">Requires Attention</h2>
-          <div className="space-y-3">
-            {data.attentionItems.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-lg border p-4 ${SEVERITY_STYLES[item.severity]}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-zinc-900">{item.title}</p>
-                    <p className="mt-0.5 text-xs text-zinc-600">{item.description}</p>
+      <div className="grid gap-5 lg:grid-cols-3">
+        {/* ── open anomalies ─────────────────────────────────────────── */}
+        <Plate
+          title="Needs attention"
+          meta={open.data ? `${open.data.total} open` : undefined}
+          className="lg:col-span-2"
+        >
+          {open.loading ? (
+            <p className="stamp py-4 text-stamp-sm text-mute">Checking…</p>
+          ) : (open.data?.items.length ?? 0) === 0 ? (
+            <p className="stamp py-4 text-stamp-sm text-mute">
+              Nothing open — the fleet is behaving
+            </p>
+          ) : (
+            <ul>
+              {open.data?.items.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-start justify-between gap-3 border-b border-line/60 py-2.5 last:border-0"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <StatusPill status={a.severity} kind="severity" />
+                      <span className="stamp text-stamp-sm text-ink">
+                        {a.type.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-note text-steel">{a.message}</p>
+                    <p className="font-mono text-data-xs text-mute">
+                      {formatDateTime(a.detectedAt)} UTC
+                    </p>
                   </div>
                   <Link
-                    href={`/asset/${item.equipmentCode}`}
-                    className="shrink-0 text-xs font-medium text-blue-600 hover:underline"
+                    href={`/asset/${a.equipmentId}`}
+                    className="stamp shrink-0 text-stamp-sm text-hivis underline-offset-4 hover:underline"
                   >
                     View →
                   </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Plate>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold text-zinc-800">Status Distribution</h2>
-          <div style={{ height: 240 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={donutData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {donutData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value, name) => [Number(value ?? 0), String(name)]} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-            {donutData.map((d) => (
-              <div key={d.name} className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.fill }} />
-                <span className="text-zinc-600">{d.name}</span>
-                <span className="font-semibold text-zinc-800">{d.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+        {/* ── status mix ─────────────────────────────────────────────── */}
+        <StatusBar data={f?.statusDistribution ?? []} />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard label="Available" value={String(data.availableCount)} />
-        <KpiCard label="In Maintenance" value={String(data.maintenanceCount)} />
-        <KpiCard label="Total Fleet" value={String(data.totalMachines)} />
+        {/* ── machines currently out ─────────────────────────────────── */}
+        <Plate title="Out now" meta={f ? `${f.machinesOut} machines` : undefined}>
+          {(out.data?.items.length ?? 0) === 0 ? (
+            <p className="stamp py-4 text-stamp-sm text-mute">Nothing checked out</p>
+          ) : (
+            <PlateRows>
+              {out.data?.items.map((e) => (
+                <PlateRow
+                  key={e.id}
+                  label={e.type.replace(/_/g, " ")}
+                  value={
+                    <Link
+                      href={`/asset/${e.id}`}
+                      className="text-hivis underline-offset-4 hover:underline"
+                    >
+                      {e.code}
+                    </Link>
+                  }
+                />
+              ))}
+            </PlateRows>
+          )}
+        </Plate>
+
+        <Plate title="Fleet condition" className="lg:col-span-2">
+          <PlateRows>
+            <PlateRow label="In maintenance" value={f ? String(f.maintenanceCount) : "—"} />
+            <PlateRow label="Reserved" value={String(countOf(f, "RESERVED"))} />
+            <PlateRow label="Retired" value={String(countOf(f, "RETIRED"))} />
+            <PlateRow
+              label="Total fleet"
+              value={<span className="text-data-lg">{f ? f.totalMachines : "—"}</span>}
+            />
+          </PlateRows>
+        </Plate>
       </div>
+    </>
+  );
+}
+
+function countOf(f: FleetAnalytics | null, status: string): number {
+  return f?.statusDistribution.find((s) => s.status === status)?.count ?? 0;
+}
+
+function PageHeader() {
+  return (
+    <header className="mb-6">
+      <p className="stamp text-stamp-xs text-hivis">Rental store</p>
+      <h1 className="font-display text-title-lg font-bold uppercase text-ink">Fleet overview</h1>
+    </header>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  unit,
+  note,
+  alert,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  note?: string;
+  alert?: boolean;
+}) {
+  return (
+    <div className="bg-plate p-4">
+      <p className="stamp text-stamp-xs text-mute">{label}</p>
+      <p className={`mt-1.5 font-mono text-data-xl ${alert ? "text-alert" : "text-ink"}`}>
+        {value}
+        {unit ? <span className="ml-0.5 text-data-sm text-mute">{unit}</span> : null}
+      </p>
+      <p className="mt-0.5 text-note text-mute">{note ?? " "}</p>
     </div>
   );
 }

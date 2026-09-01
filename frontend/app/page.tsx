@@ -19,7 +19,7 @@ export default function Home() {
 
   return (
     <div className="grid min-h-screen place-items-center">
-      <p className="stamp text-[11px] text-mute">Loading…</p>
+      <p className="stamp text-stamp text-mute">Loading…</p>
     </div>
   );
 }

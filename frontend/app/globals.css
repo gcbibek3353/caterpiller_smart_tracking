@@ -1,38 +1,125 @@
 @import "tailwindcss";
 
 /**
- * "Data plate" — the visual system for Smart Rental Tracking.
+ * ══════════════════════════════════════════════════════════════════════════
+ *  DATA PLATE — the design system for Smart Rental Tracking
+ *  Single source of truth. See frontend/DESIGN.md for the written spec.
+ * ══════════════════════════════════════════════════════════════════════════
  *
  * Every machine in a yard carries a stamped identification plate: condensed
  * caps, tight label/value pairs, mono serials. That plate is the signature
  * element here, and the palette is workwear: graphite, steel, concrete dust,
  * and one hi-vis orange for anything you can act on.
  *
- * Accent discipline: orange means "actionable". It is never decorative.
- * Machine STATE uses the status ramp instead, so a colour always means one thing.
+ * Three rules the whole system rests on:
+ *
+ *   1. ACCENT DISCIPLINE — hi-vis orange means "you can act on this". It is
+ *      never decorative and never a data series.
+ *   2. ONE COLOUR, ONE MEANING — machine state uses the status ramp; a colour
+ *      never does double duty as decoration.
+ *   3. UI COLOUR ≠ CHART COLOUR — the workwear palette is deliberately
+ *      desaturated, which is right for chrome and wrong for data series that
+ *      must be told apart. Charts draw from their own validated ramp below.
+ *
+ * This app is light-only by design (a yard tablet in daylight), so there is
+ * one committed palette rather than a light/dark pair.
  */
-@theme {
-  --color-ink: #16181a;
-  --color-steel: #3d4550;
-  --color-mute: #6c7480;
-  --color-line: #d3cfc7;
-  --color-dust: #edebe6;
-  --color-plate: #ffffff;
 
+@theme {
+  /* ── Surface & ink ─────────────────────────────────────────────────── */
+  --color-ink: #16181a; /* primary text, dark chrome */
+  --color-steel: #3d4550; /* secondary text */
+  --color-mute: #6c7480; /* tertiary text, axis labels */
+  --color-line: #d3cfc7; /* hairline borders */
+  --color-dust: #edebe6; /* page plane */
+  --color-plate: #ffffff; /* card surface */
+
+  /* ── Accent — actionable only ──────────────────────────────────────── */
   --color-hivis: #ff6b1a;
   --color-hivis-deep: #d8500a;
 
-  /* equipment + severity states — one colour, one meaning */
+  /* ── Status ramp — one colour, one meaning ─────────────────────────── */
   --color-ok: #1f7a5c;
   --color-warn: #b8860b;
   --color-alert: #c1272d;
   --color-busy: #2b5f8a;
 
+  /* ── Chart ramp ────────────────────────────────────────────────────────
+   * Re-stepped from the status hues to pass contrast + colour-vision checks
+   * as adjacent data marks, which the UI ramp does not. Validated with the
+   * dataviz palette checker against the #ffffff plate surface:
+   *   chart-1 ↔ chart-3   ΔE 20.9 normal / 20.9 CVD   (temp vs limit)
+   *   chart-2 ↔ chart-3   ΔE 20.2 normal /  8.2 CVD   (working vs idle)
+   *   chart-1 ↔ chart-mute ΔE 20.9 normal / 17.8 CVD  (series vs context)
+   * chart-mute is the de-emphasis channel — it is *meant* to read grey.
+   */
+  --color-chart-1: #1f6fb2; /* primary series: engine hours, fuel, temperature */
+  --color-chart-2: #0f8a55; /* working hours */
+  --color-chart-3: #c28a00; /* idle hours */
+  --color-chart-mute: #9aa0a8; /* moving averages, OFF state, retired */
+  --color-chart-limit: #c1272d; /* threshold rules, critical marks */
+  --color-chart-grid: #d3cfc7;
+
+  /* ── Typography ────────────────────────────────────────────────────────
+   * Four registers, named by ROLE not by size, so the class says what the
+   * text *is*. Tracking is baked into each step — small stamps need more of
+   * it than large ones, and that is not something to re-decide per usage.
+   */
   --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
   --font-sans: var(--font-barlow), system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
+  /* STAMP — condensed uppercase labels. The signature motif. */
+  --text-stamp-xs: 0.5625rem; /*  9px */
+  --text-stamp-xs--line-height: 1.1;
+  --text-stamp-xs--letter-spacing: 0.16em;
+  --text-stamp-sm: 0.625rem; /* 10px */
+  --text-stamp-sm--line-height: 1.2;
+  --text-stamp-sm--letter-spacing: 0.15em;
+  --text-stamp: 0.6875rem; /* 11px */
+  --text-stamp--line-height: 1.2;
+  --text-stamp--letter-spacing: 0.14em;
+  --text-stamp-lg: 0.75rem; /* 12px */
+  --text-stamp-lg--line-height: 1.2;
+  --text-stamp-lg--letter-spacing: 0.13em;
+
+  /* DATA — mono. Machine-produced numbers and identifiers. */
+  --text-data-xs: 0.6875rem; /* 11px */
+  --text-data-xs--line-height: 1.4;
+  --text-data-sm: 0.75rem; /* 12px */
+  --text-data-sm--line-height: 1.45;
+  --text-data: 0.875rem; /* 14px */
+  --text-data--line-height: 1.5;
+  --text-data-lg: 1.125rem; /* 18px */
+  --text-data-lg--line-height: 1.35;
+  --text-data-xl: 1.5rem; /* 24px — KPI value */
+  --text-data-xl--line-height: 1.15;
+  --text-data-2xl: 2rem; /* 32px — hero figure */
+  --text-data-2xl--line-height: 1.05;
+
+  /* PROSE — sans. Anything a human wrote. */
+  --text-note: 0.8125rem; /* 13px — hints, errors, captions */
+  --text-note--line-height: 1.5;
+  --text-body: 0.9375rem; /* 15px */
+  --text-body--line-height: 1.6;
+
+  /* DISPLAY — condensed headings. */
+  --text-title-sm: 1.5rem; /* 24px */
+  --text-title-sm--line-height: 1.05;
+  --text-title-sm--letter-spacing: -0.01em;
+  --text-title: 2rem; /* 32px */
+  --text-title--line-height: 1.02;
+  --text-title--letter-spacing: -0.015em;
+  --text-title-lg: 2.75rem; /* 44px — page header */
+  --text-title-lg--line-height: 1;
+  --text-title-lg--letter-spacing: -0.02em;
+
+  /* ── Geometry ──────────────────────────────────────────────────────── */
   --radius-plate: 2px;
+  --radius-plate-lg: 4px;
+
+  --shadow-plate: 0 1px 0 0 rgb(0 0 0 / 0.06);
+  --shadow-raised: 0 2px 8px -2px rgb(22 24 26 / 0.16);
 }
 
 html {
@@ -42,24 +129,38 @@ html {
 
 body {
   font-family: var(--font-sans);
+  font-size: var(--text-body);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Stamped label: the typographic motif that ties the system together. */
-.stamp {
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-weight: 600;
-}
+@layer components {
+  /**
+   * The stamped label. Sits in the components layer on purpose so any
+   * `text-stamp-*` utility wins over its default tracking.
+   */
+  .stamp {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+  }
 
-/* Hazard striping — used only on the sign-in plate and destructive edges. */
-.hazard {
-  background-image: repeating-linear-gradient(
-    -45deg,
-    var(--color-ink) 0 8px,
-    var(--color-hivis) 8px 16px
-  );
+  /* Hazard striping — the sign-in plate and destructive edges only. */
+  .hazard {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      var(--color-ink) 0 8px,
+      var(--color-hivis) 8px 16px
+    );
+  }
+
+  /**
+   * Recharts' ResponsiveContainer measures its parent, so that parent needs a
+   * real height. Every chart wrapper gets this plus an explicit height.
+   */
+  .chart-container {
+    width: 100%;
+  }
 }
 
 /* Focus is visible everywhere. This app gets used one-handed on a phone. */
@@ -75,10 +176,4 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-/* C11/C7's charts set an explicit pixel height on this wrapper —
-   ResponsiveContainer needs a parent with a real height to size into. */
-.chart-container {
-  width: 100%;
 }

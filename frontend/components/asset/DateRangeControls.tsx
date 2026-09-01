@@ -1,6 +1,6 @@
 "use client";
 
-export type DateRangeDays = 7 | 14 | 21;
+export type DateRangeDays = 1 | 7 | 14 | 21;
 export type BucketSize = "10m" | "1h" | "1d";
 
 export interface DateRangeControlsProps {
@@ -8,54 +8,79 @@ export interface DateRangeControlsProps {
   bucket: BucketSize;
   onDaysChange: (days: DateRangeDays) => void;
   onBucketChange: (bucket: BucketSize) => void;
+  /** Rendered on the right — usually the live row count behind the charts. */
+  meta?: string;
+  busy?: boolean;
 }
 
+const DAY_OPTIONS: DateRangeDays[] = [1, 7, 14, 21];
+const BUCKET_OPTIONS: BucketSize[] = ["10m", "1h", "1d"];
+
+/**
+ * The shared range + bucket control. Filters sit in one row above the charts
+ * they govern, and both values are sent to the API — bucketing happens in
+ * Postgres, never by downsampling 21 days of ticks in the browser.
+ */
 export function DateRangeControls({
   days,
   bucket,
   onDaysChange,
   onBucketChange,
+  meta,
+  busy,
 }: DateRangeControlsProps) {
-  const dayOptions: DateRangeDays[] = [7, 14, 21];
-  const bucketOptions: BucketSize[] = ["10m", "1h", "1d"];
-
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-medium uppercase text-zinc-500">Range</span>
-        <div className="flex overflow-hidden rounded-lg border border-zinc-200">
-          {dayOptions.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => onDaysChange(d)}
-              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                days === d ? "bg-zinc-900 text-white" : "bg-white text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              {d}d
-            </button>
-          ))}
-        </div>
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-plate border border-line bg-plate px-4 py-3 shadow-plate">
+      <Segmented
+        legend="Range"
+        options={DAY_OPTIONS.map((d) => ({ value: d, label: d === 1 ? "24h" : `${d}d` }))}
+        selected={days}
+        onSelect={onDaysChange}
+      />
+      <Segmented
+        legend="Bucket"
+        options={BUCKET_OPTIONS.map((b) => ({ value: b, label: b }))}
+        selected={bucket}
+        onSelect={onBucketChange}
+      />
+      <p className="stamp ml-auto text-stamp-xs text-mute">
+        {busy ? "Loading…" : (meta ?? "")}
+      </p>
+    </div>
+  );
+}
+
+function Segmented<T extends string | number>({
+  legend,
+  options,
+  selected,
+  onSelect,
+}: {
+  legend: string;
+  options: { value: T; label: string }[];
+  selected: T;
+  onSelect: (value: T) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="stamp text-stamp-xs text-mute">{legend}</span>
+      <div className="flex overflow-hidden rounded-plate border border-line">
+        {options.map((o) => (
+          <button
+            key={String(o.value)}
+            type="button"
+            aria-pressed={selected === o.value}
+            onClick={() => onSelect(o.value)}
+            className={`stamp border-r border-line px-2.5 py-1.5 text-stamp-sm transition-colors last:border-r-0 ${
+              selected === o.value
+                ? "bg-ink text-plate"
+                : "bg-plate text-steel hover:bg-dust"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-medium uppercase text-zinc-500">Bucket</span>
-        <div className="flex overflow-hidden rounded-lg border border-zinc-200">
-          {bucketOptions.map((b) => (
-            <button
-              key={b}
-              type="button"
-              onClick={() => onBucketChange(b)}
-              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                bucket === b ? "bg-zinc-900 text-white" : "bg-white text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              {b}
-            </button>
-          ))}
-        </div>
-      </div>
-      <p className="ml-auto text-xs text-zinc-400">Fixture data — API wiring pending A8 seed</p>
     </div>
   );
 }

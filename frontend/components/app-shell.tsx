@@ -34,7 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (isPending || !user) {
     return (
       <div className="grid min-h-screen place-items-center">
-        <p className="stamp text-[11px] text-mute">Checking credentials…</p>
+        <p className="stamp text-stamp text-mute">Checking credentials…</p>
       </div>
     );
   }
@@ -46,10 +46,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* ── rail ─────────────────────────────────────────── */}
       <aside className="flex flex-col border-line bg-ink text-dust md:border-r">
         <Link href={homeFor(user.role)} className="flex items-baseline gap-2 px-5 py-4">
-          <span className="font-display text-2xl font-bold uppercase leading-none tracking-tight text-plate">
+          <span className="font-display text-title-sm font-bold uppercase leading-none tracking-tight text-plate">
             Yard
           </span>
-          <span className="stamp text-[9px] text-hivis">Rental Ops</span>
+          <span className="stamp text-stamp-xs text-hivis">Rental Ops</span>
         </Link>
 
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:overflow-visible md:pb-0">
@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`stamp shrink-0 border-l-2 px-3 py-2.5 text-[11px] transition-colors ${
+                className={`stamp shrink-0 border-l-2 px-3 py-2.5 text-stamp transition-colors ${
                   active
                     ? "border-hivis bg-plate/10 text-plate"
                     : "border-transparent text-dust/55 hover:text-plate"
@@ -76,12 +76,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {/* identity, stamped like a plate */}
         <div className="mt-auto hidden border-t border-plate/15 px-4 pb-10 pt-4 md:block">
-          <p className="stamp text-[9px] text-hivis">{user.role}</p>
-          <p className="mt-1 truncate text-sm text-plate">{user.name}</p>
-          <p className="truncate font-mono text-[11px] text-dust/50">{user.email}</p>
+          <p className="stamp text-stamp-xs text-hivis">{user.role}</p>
+          <p className="mt-1 truncate text-body text-plate">{user.name}</p>
+          <p className="truncate font-mono text-data-xs text-dust/50">{user.email}</p>
           <button
             onClick={() => signOut().then(() => router.replace("/login"))}
-            className="stamp mt-3 text-[10px] text-dust/55 underline-offset-4 hover:text-hivis hover:underline"
+            className="stamp mt-3 text-stamp-sm text-dust/55 underline-offset-4 hover:text-hivis hover:underline"
           >
             Sign out
           </button>
