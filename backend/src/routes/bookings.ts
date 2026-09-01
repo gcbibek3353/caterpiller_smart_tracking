@@ -24,7 +24,7 @@ bookingRoutes.use("*", requireAuth);
  * availability filter ever disagree, the catalogue offers a machine that
  * POST /api/bookings then refuses, which looks like a random 409 to the user.
  */
-const BLOCKING_STATUSES: Prisma.EnumBookingStatusFilter["in"] = [
+export const BLOCKING_STATUSES: Prisma.EnumBookingStatusFilter["in"] = [
   "PENDING",
   "CONFIRMED",
   "CHECKED_OUT",
@@ -41,7 +41,7 @@ const BLOCKING_STATUSES: Prisma.EnumBookingStatusFilter["in"] = [
  * `excludeBookingId` is for PATCH, where the row being edited must not be
  * treated as a conflict with itself.
  */
-const overlapWhere = (
+export const overlapWhere = (
   equipmentId: string,
   startDate: Date,
   endDate: Date,
