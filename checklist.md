@@ -29,7 +29,11 @@
 | **D** | D2 — `lib/stats.ts` + forecasting | Zero deps, pure functions over arrays |
 | **D** | D3 — anomaly detectors (pure fns) | Zero deps |
 | **B/C/D** | **Anything needing the DB** | ✅ Schema is pushed — `prisma generate` works |
-| **A** | A4 — `contracts.ts` | Next on A's list |
+| **B** | **B4 — Booking API** | ✅ contracts + auth guards + `validate()` all landed |
+| **B** | **B5/B6 — confirm, QR, scan** | ✅ `requireRole("ADMIN")` and `ScanCommitInput` ready (still stub `sendMail()` until D4) |
+| **C** | **C4 — Ingest + rollup** | ✅ `requireApiKey` + `IngestInput` (accepts bare array *or* `{ticks:[]}`) ready |
+| **D** | **D4 — Mailer** | ✅ `Notification` model live |
+| **A** | A7 — Equipment/Site/Operator CRUD | Next on A's list |
 
 ## 🚧 Blocked right now
 
@@ -41,6 +45,39 @@
 | A9 real rollup in seed | C4 (rollup service) |
 | B10 phone scanner re-test | A11 (deploy) |
 | C12 asset timeline | D5 (anomalies exist) |
+
+---
+
+## 📦 What A has shipped that you can import right now
+
+```ts
+// guards — src/middleware/auth.ts
+import { requireAuth, optionalAuth, requireRole, requireApiKey,
+         assertCanSeeEquipment, assertCanSeeBooking } from "../middleware/auth";
+
+// request validation — src/middleware/validate.ts
+import { validate, valid } from "../middleware/validate";
+app.post("/", requireAuth, validate("json", CreateBookingInput), (c) => {
+  const body = valid(c, "json", CreateBookingInput);   // typed, coerced, defaulted
+});
+
+// contracts — src/contracts/
+import { CreateBookingInput, EquipmentListQuery, IngestInput, ScanCommitInput,
+         QR_PREFIX, ANOMALY_TYPES } from "../contracts";
+
+// responses — src/lib/http.ts   (throw the errors; middleware formats them)
+import { ok, AppError, notFound, forbidden, badRequest, conflict } from "../lib/http";
+
+// hono generics — src/types.ts
+import type { AppEnv, SessionUser } from "../types";
+const app = new Hono<AppEnv>();     // gives you c.get("user") typed
+```
+
+**Auth endpoints live:** `POST /api/auth/sign-up/email`, `POST /api/auth/sign-in/email`,
+`POST /api/auth/sign-out`, `GET /api/auth/me`.
+Browser calls need `credentials: "include"`; state-changing calls need an `Origin` header
+(better-auth rejects `MISSING_OR_NULL_ORIGIN` — this bites curl, never a browser).
+New signups are **always CLIENT** — `role` is `input: false`, so it can't be set from the client.
 
 ---
 
@@ -57,11 +94,13 @@
 | Adminer port | **8081** |
 | Repo layout | Backend is **fully self-contained in `backend/`**, incl. `docker-compose.yml` |
 
-### ⚠️ Open decision — needs an answer before A4
-**Where does `shared/` (zod contracts) live?** The plan puts it at the repo root because
-*both* backend and frontend import it, which conflicts with "everything backend in `backend/`".
-Options: (a) root `shared/` package, (b) `backend/src/contracts.ts` + frontend imports across,
-(c) duplicate the types. **A decides and records it here.**
+### ✅ Resolved — contracts are duplicated, not shared
+**Decision: no `shared/` package.** Backend zod schemas live in `backend/src/contracts/`;
+the frontend hand-writes matching TypeScript types. Zero build config, fully independent tracks.
+
+⚠️ **The cost:** a field rename becomes a *runtime* bug, not a compile error. So:
+**if you change a contract, say so in chat the same minute.** The backend is the source of
+truth — `backend/src/contracts/` wins any disagreement.
 
 ---
 
@@ -71,9 +110,9 @@ Options: (a) root `shared/` package, (b) `backend/src/contracts.ts` + frontend i
 - [~] **A1** · H0–H0.75 — Contract workshop · *decisions **drafted** in the table above from `steps.md` §2/§3. Not yet signed off by B/C/D — walk the table with them and tick this.*
 - [x] **A2** · H0.75–H1.25 — Scaffold + `docker-compose.yml` (postgres :5433 + adminer :8081), `.env` + `.env.example`
 - [x] **A3** · H1.25–H2.5 — **`schema.prisma` — THE CRITICAL PATH** · *pushed, 14 tables live; better-auth models verified against `@better-auth/cli generate` (zero drift); round-trip tested incl. idempotent ingest + DailyUsage upsert*
-- [ ] **A4** · H2.5–H3 — `contracts.ts` — zod schema for every request/response in §3 ⛔ *needs the `shared/` location decision above*
-- [~] **A5** · H3–H4 — better-auth · *`src/lib/auth.ts` instance written (prisma adapter, emailAndPassword, role/companyName/phone additionalFields, 7-day session).* **Still missing: mount at `/api/auth/*` in Hono, `requireAuth`, `requireRole('ADMIN')`, `assertCanSeeEquipment`.** Announce import paths in chat when done.
-- [~] **A6** · H4–H4.5 — Hono hardening · *CORS `credentials:true` ✅, error envelope ✅, `/health` ✅.* **Missing: zod validation middleware.**
+- [x] **A4** · H2.5–H3 — Contracts · *`backend/src/contracts/` — 10 files, zod schema for every endpoint in §3. Enums use `z.nativeEnum` off the generated Prisma client, so a schema change is a compile error here. Import from `../contracts`.*
+- [x] **A5** · H3–H4 — better-auth · *mounted at `/api/auth/*`. Guards in `src/middleware/auth.ts`: `requireAuth`, `optionalAuth`, `requireRole(...)`, `requireApiKey`, `assertCanSeeEquipment`, `assertCanSeeBooking`. Verified end-to-end: signup, signin, signout deletes the session row, stale cookie 401s, untrusted origin rejected, `role` escalation at signup blocked.*
+- [x] **A6** · H4–H4.5 — Hono hardening · *CORS `credentials:true`, error envelope (Zod + Prisma P2002/P2025), `/health`, and `validate()` / `valid()` in `src/middleware/validate.ts`.*
 - [ ] **A7** · H4.5–H5.5 — Equipment / Site / Operator CRUD + availability date-overlap filter
 - [ ] **A8** · H5.5–H9 — **`prisma/seed.ts`** — highest-leverage file in the repo. 1 admin + 5 clients (create via better-auth signup so hashing matches), ~40 machines lopsided mix, sites + operators, ~600 bookings with trend + annual seasonality + weekday effects, `DailyUsage` 12 months, raw `Telemetry` **last 21 days only**. Under 90s, re-runnable. **Then `pg_dump` and commit the `.sql`.**
 - [ ] **A9** · H9–H9.5 — Swap in C's real rollup for the last 21 days ⛔ *needs C4; skip if late*
@@ -126,10 +165,10 @@ Options: (a) root `shared/` package, (b) `backend/src/contracts.ts` + frontend i
 *Best-positioned on the team: every algorithm here is a pure function over arrays.*
 
 - [ ] **D1** · H0–H0.75 — Contract workshop
-- [ ] **D2** · H0.75–H3.5 — **`lib/stats.ts` + forecasting. ZERO deps, zero DB.** median, MAD, robust z, EWMA, MAE, MASE, haversine — unit-tested. Then: demand-series builder (**rental-days**, not booking counts), seasonal-naive benchmark, Holt-Winters + α/β/γ grid search, rolling-origin backtest, prediction intervals from per-horizon residual σ. Test against synthetic arrays with seasonality you injected, so you know the right answer.
+- [x] **D2** · H0.75–H3.5 — **`lib/stats.ts` + forecasting. ZERO deps, zero DB.** · *done — `median`/`mad`/`robustZ`/`ewma`/`mae`/`mase`/`smape`/`haversine`/`stddev` unit-tested; `services/forecast/`: demand-series builder (rental-days), seasonal-naive, Holt-Winters + α/β/γ grid search, rolling-origin backtest, prediction intervals, recommendation-sentence builder + cold-start check. 43 tests passing.*
 - [-] **D2b** — Ridge regression model (§8C) — **cut for 24h.** Two models + an honest MASE beats three half-wired.
-- [ ] **D3** · H3.5–H5 — Every anomaly detector as a pure function ⛔ *no deps* — daily rules over `DailyUsage[]`, realtime over `Telemetry[]`, booking rules. **All thresholds in one `services/anomaly/config.ts`** — you'll retune these live at H19.
-- [ ] **D4** · H5–H6.5 — Mailer ⛔ *needs A3 ✅* — `MAIL_MODE=console` → `backend/.mail/*.html`; templates `BOOKING_CONFIRMED` (QR as PNG attachment), `CHECKOUT_RECEIPT`, `CHECKIN_RECEIPT`, `RETURN_REMINDER`, `OVERDUE`, `ANOMALY_ALERT`, `ANOMALY_DIGEST`. **Every send writes a `Notification` row `PENDING` → `SENT`/`FAILED`** with a unique `dedupeKey`. **Message B the moment `sendMail()` is importable.**
+- [x] **D3** · H3.5–H5 — Every anomaly detector as a pure function ⛔ *no deps* · *done — all daily/realtime/booking rules from §9, plus layer-2 robust-z + EWMA (ahead of schedule). Thresholds centralized in `services/anomaly/config.ts`. 53 tests passing.*
+- [~] **D4** · H5–H6.5 — Mailer ⛔ *needs A3 ✅* · *DB-free half done: all 7 templates, console transport (`.mail/*.html`), Resend transport (talks to Resend's HTTP API directly, no SDK dep), `MAIL_MODE`-driven `createMailTransport()` factory, pure `Notification` PENDING→SENT/FAILED builder. Verified end-to-end against real `env.ts` with `MAIL_MODE=resend` + a `RESEND_API_KEY` in `backend/.env` (gitignored, not committed). **Still missing: the actual Prisma `Notification` row write** (needs a live DB — this is what makes `sendMail()` real for B to import) **and the QR-PNG attachment wiring**, which is Person B's `lib/qr.ts` output, not built here.*
 - [ ] **D5** · H6.5–H8 — Detector runner + dedupe ⛔ *needs A8* — `dedupeKey = "{type}:{equipmentId}:{dayBucket}"` (hour bucket for realtime) behind the unique index. **Build dedupe WITH the detector, not after** — without it one stuck machine emits 144 emails. Then `GET /api/anomalies` (role-scoped), `PATCH /:id`, `POST /api/anomalies/run`.
 - [ ] **D6** · H8–H9.5 — Forecast runner on real data ⛔ *needs A8* — build series from seeded bookings, run both models, pick by MASE, write `DemandForecast`. **Generate the recommendation sentences** — they're what people remember.
 - [ ] **D7** · H9.5–H11 — Scheduler (`croner`): 10-min realtime, hourly booking rules + digest flush, daily rollup → daily detectors, weekly forecast retrain. `isRunning` guard. **Every job also gets a manual POST trigger.**
