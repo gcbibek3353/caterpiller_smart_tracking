@@ -224,6 +224,49 @@ console.log("\n── a returned booking is closed to the table's controls ─�
 r = await admin(`/api/bookings/${bookingId}`, { method: "PATCH", body: JSON.stringify({ siteId }) });
 check("PATCH a RETURNED booking → 409 (row hides Assign for this reason)", r.status === 409, `got ${r.status}`);
 
+// ══ B11: the edge cases the scanner has to say something useful about ══
+console.log("\n── B11: an already-used QR ──");
+r = await admin("/api/scan/resolve", { method: "POST", body: JSON.stringify({ token }) });
+check("re-scanning a RETURNED booking → 409", r.status === 409, `got ${r.status}`);
+check("  message says it was already used", /already been used/i.test(String(r.body?.error?.message)), JSON.stringify(r.body?.error?.message));
+let d = r.body?.error?.details;
+check("  details.status is RETURNED", d?.status === "RETURNED", JSON.stringify(d?.status));
+check("  details.booking present (panel shows what was scanned)", d?.booking?.code != null);
+check("  details.booking.checkinAt set (panel timestamps the refusal)", d?.booking?.checkinAt != null, JSON.stringify(d?.booking?.checkinAt));
+check("  details.booking.checkoutAt set", d?.booking?.checkoutAt != null);
+check("  and still no qrToken in a refusal", d?.booking?.qrToken === undefined);
+r = await admin("/api/scan/commit", { method: "POST", body: JSON.stringify({ token, action: "CHECK_OUT" }) });
+check("committing it anyway → 409, not a silent re-check-out", r.status === 409, `got ${r.status}`);
+
+console.log("\n── B11: a cancelled booking's QR ──");
+r = await admin(`/api/bookings/${pend.body?.data?.id}`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) });
+check("cancel the pending booking → 200", r.status === 200, JSON.stringify(r.body?.error));
+r = await admin("/api/scan/resolve", { method: "POST", body: JSON.stringify({ token: pendToken }) });
+check("scanning a CANCELLED booking → 409", r.status === 409, `got ${r.status}`);
+check("  message says cancelled, not 'not found'", /cancelled/i.test(String(r.body?.error?.message)), JSON.stringify(r.body?.error?.message));
+d = r.body?.error?.details;
+check("  details.status is CANCELLED", d?.status === "CANCELLED", JSON.stringify(d?.status));
+check("  details.booking present", d?.booking?.code != null);
+
+console.log("\n── B11: overdue badges run off the server flag ──");
+// Push a live rental a clear day past its return date and confirm BOTH the
+// list flag and the ?overdue= filter agree. They used to be derived in two
+// places with two different rules.
+const od = await c1("/api/bookings", { method: "POST", body: JSON.stringify({ equipmentId: eqId, startDate: "2027-11-01T00:00:00.000Z", endDate: "2027-11-05T00:00:00.000Z" }) });
+const odId = od.body?.data?.id;
+await prisma.booking.update({ where: { id: odId }, data: { status: "CHECKED_OUT", endDate: new Date(Date.now() - 3 * 86_400_000) } });
+r = await admin("/api/bookings?limit=200");
+const odRow = (r.body?.data?.items ?? []).find((b: any) => b.id === odId);
+check("a 3-day-late rental has isOverdue true on the row", odRow?.isOverdue === true, JSON.stringify(odRow?.isOverdue));
+r = await admin("/api/bookings?overdue=true");
+check("  and the Overdue-only chip returns it", (r.body?.data?.items ?? []).some((b: any) => b.id === odId));
+// Exactly inside the grace day: due at midnight this morning, not late yet.
+await prisma.booking.update({ where: { id: odId }, data: { endDate: new Date(Date.now() - 3600_000) } });
+r = await admin("/api/bookings?limit=200");
+check("due earlier TODAY is not yet overdue (the grace day)", ((r.body?.data?.items ?? []).find((b: any) => b.id === odId))?.isOverdue === false, "still flagged late on the return day");
+r = await admin("/api/bookings?overdue=true");
+check("  and the filter agrees with the flag", !(r.body?.data?.items ?? []).some((b: any) => b.id === odId));
+
 console.log(`\n${fail === 0 ? "✅" : "❌"}  ${pass} passed, ${fail} failed`);
 await prisma.$disconnect();
 process.exit(fail === 0 ? 0 : 1);

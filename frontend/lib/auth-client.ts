@@ -15,7 +15,9 @@ import type { Role } from "./types";
  * types, because the team chose duplicated contracts over a shared package.
  */
 export const authClient = createAuthClient({
-  baseURL: API_URL,
+  // "" means the same-origin /api rewrite; better-auth wants a concrete origin,
+  // so resolve it here rather than handing it an empty string.
+  baseURL: API_URL || (typeof window === "undefined" ? undefined : window.location.origin),
   basePath: "/api/auth",
   plugins: [
     inferAdditionalFields({

@@ -1,6 +1,16 @@
 import type { Paginated } from "./types";
 
+/**
+ * Origin of the API — or the empty string, meaning "same origin, reached
+ * through the `/api` rewrite in next.config.ts". `bun run dev:https` selects
+ * the second form so a phone on the LAN has no cross-origin call to make; see
+ * the rewrite's comment for why that is the only arrangement that works there.
+ */
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+/** Only used to resolve a relative API_URL; ignored when it is absolute. */
+const sameOrigin = () =>
+  typeof window === "undefined" ? "http://localhost:3000" : window.location.origin;
 
 /** The backend's failure envelope: `{ error: { code, message, details? } }`. */
 export class ApiError extends Error {
@@ -45,7 +55,7 @@ type FetchOptions = Omit<RequestInit, "body"> & {
 export async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
   const { body, query, headers, ...rest } = options;
 
-  const url = new URL(path.startsWith("http") ? path : `${API_URL}${path}`);
+  const url = new URL(path.startsWith("http") ? path : `${API_URL}${path}`, sameOrigin());
   if (query) {
     for (const [k, v] of Object.entries(query)) {
       if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
 import type {
@@ -35,9 +36,35 @@ const CANCELLABLE: BookingStatus[] = ["PENDING", "CONFIRMED"];
 const day = (iso: string | null) => (iso ? iso.slice(0, 10) : "—");
 const PAGE_SIZE = 50;
 
+const VALID_STATUS = new Set<string>(FILTERS.map((f) => f.value).filter(Boolean));
+
+/**
+ * `useSearchParams` makes everything up to the nearest Suspense boundary
+ * client-rendered, so the boundary sits here rather than swallowing the whole
+ * route — the header and chrome still prerender.
+ */
 export default function AdminBookingsPage() {
-  const [status, setStatus] = useState<BookingStatus | "">("");
-  const [overdue, setOverdue] = useState(false);
+  return (
+    <Suspense fallback={<p className="stamp text-stamp text-mute">Reading the book…</p>}>
+      <BookingsDesk />
+    </Suspense>
+  );
+}
+
+function BookingsDesk() {
+  /**
+   * `?status=` is a deep link, not a stored filter — the scanner sends
+   * `?status=PENDING` when it refuses an unconfirmed booking, so the admin
+   * lands on the row they need instead of on "All". Read once as the initial
+   * value; the chips own it from then on.
+   */
+  const params = useSearchParams();
+  const initialStatus = params.get("status") ?? "";
+
+  const [status, setStatus] = useState<BookingStatus | "">(
+    VALID_STATUS.has(initialStatus) ? (initialStatus as BookingStatus) : "",
+  );
+  const [overdue, setOverdue] = useState(params.get("overdue") === "true");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [find, setFind] = useState("");

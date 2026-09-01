@@ -102,17 +102,7 @@ export default function AdminScannerPage() {
           ) : null}
 
           {stage.name === "refused" ? (
-            <Plate title="Cannot scan this" tone="hivis">
-              <p className="text-body text-alert">{stage.message}</p>
-              {stage.booking ? (
-                <div className="mt-4">
-                  <BookingIdentity booking={stage.booking} />
-                </div>
-              ) : null}
-              <div className="mt-4 flex justify-end">
-                <Button onClick={reset}>Scan another</Button>
-              </div>
-            </Plate>
+            <Refused message={stage.message} booking={stage.booking} onReset={reset} />
           ) : null}
 
           {stage.name === "preview" ? (
@@ -131,6 +121,75 @@ export default function AdminScannerPage() {
   );
 }
 
+// ── The three refusals (B11) ─────────────────────────────────────────
+
+/**
+ * A refused scan is not an error to apologise for — it is a state with a next
+ * step, and on a phone at the gate that step needs to be one tap away. A
+ * PENDING booking in particular is refused only because nobody has confirmed
+ * it yet, and the person holding the scanner is an admin who can.
+ *
+ * Deliberately NOT `tone="hivis"`: the accent means "you can act on this", so
+ * spending it on the panel chrome would make every refusal shout. It goes on
+ * the action instead.
+ */
+function Refused({
+  message,
+  booking,
+  onReset,
+}: {
+  message: string;
+  booking?: BookingWithRelations;
+  onReset: () => void;
+}) {
+  const status = booking?.status;
+  return (
+    <Plate title="Cannot scan this" meta={booking?.code}>
+      <p className="rounded-plate border border-alert/40 bg-alert/8 p-3 text-body text-alert">
+        {message}
+      </p>
+
+      {booking ? (
+        <div className="mt-4">
+          <BookingIdentity booking={booking} />
+        </div>
+      ) : null}
+
+      <p className="mt-4 text-note text-steel">
+        {status === "PENDING"
+          ? "Nothing is wrong with the machine or the code — this booking just has not been confirmed yet. Confirm it on the bookings desk and the same QR will scan."
+          : status === "RETURNED"
+            ? "This rental is closed. If the machine is going out again it needs a new booking, which issues a new QR."
+            : status === "CANCELLED"
+              ? "Cancelled bookings never get a working QR back. The client has to book again."
+              : "Check the code and try again, or type it in by hand."}
+      </p>
+
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        {booking && status !== "PENDING" ? (
+          <Link
+            href={`/bookings/${booking.id}`}
+            className="stamp rounded-plate border border-line bg-plate px-4 py-2.5 text-stamp-lg text-ink hover:border-ink"
+          >
+            Open booking
+          </Link>
+        ) : null}
+        {status === "PENDING" ? (
+          <Link
+            href="/admin/bookings?status=PENDING"
+            className="stamp rounded-plate border border-transparent bg-hivis px-4 py-2.5 text-stamp-lg text-ink hover:bg-hivis-deep hover:text-plate"
+          >
+            Confirm it
+          </Link>
+        ) : null}
+        <Button variant={status === "PENDING" ? "secondary" : "primary"} onClick={onReset}>
+          Scan another
+        </Button>
+      </div>
+    </Plate>
+  );
+}
+
 // ── Who and what was scanned ─────────────────────────────────────────
 
 function BookingIdentity({ booking }: { booking: BookingWithRelations }) {
@@ -144,6 +203,9 @@ function BookingIdentity({ booking }: { booking: BookingWithRelations }) {
       />
       <PlateRow label="Machine" value={`${booking.equipment?.code} · ${booking.equipment?.name}`} />
       <PlateRow label="Window" value={`${day(booking.startDate)} → ${day(booking.endDate)}`} />
+      {booking.checkoutAt ? <PlateRow label="Checked out" value={stamp(booking.checkoutAt)} /> : null}
+      {/* The "already used" refusal is much easier to trust with a timestamp on it. */}
+      {booking.checkinAt ? <PlateRow label="Checked in" value={stamp(booking.checkinAt)} /> : null}
       <PlateRow label="Site" value={booking.site?.name ?? "Not assigned"} mono={false} />
       <PlateRow label="Operator" value={booking.operator?.name ?? "Not assigned"} mono={false} />
       <PlateRow label="Status" value={<StatusPill status={booking.status} kind="booking" />} mono={false} />

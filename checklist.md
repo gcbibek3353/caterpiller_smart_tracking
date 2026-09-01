@@ -47,7 +47,7 @@
 | Task | Waiting on |
 |---|---|
 | A9 real rollup in seed | C4 (rollup service) |
-| B10 phone scanner re-test | A11 (deploy) |
+| B10 phone scanner re-test | ~~A11~~ — **unblocked locally via `bun run dev:https`; only the *deployed* re-test still needs A11** |
 | C12 asset timeline | ✅ unblocked — D5 anomalies exist now |
 
 ---
@@ -272,7 +272,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 # Person B — Bookings, QR & Booking UX
 
 - [ ] **B1** · H0–H0.75 — Contract workshop
-- [~] **B2** · H0.75–H2 — **QR camera spike** · *B — code merged to `main` (`b4696f4`): `frontend/app/spike/scan/page.tsx`. `qr-scanner` (nimiq) decoding, **manual code-entry input beside the camera from day one**, secure-context banner that shows `isSecureContext`/`mediaDevices` so a blocked camera can't be mistaken for a permissions bug, and a commented-out `@zxing/browser` fallback with the swap note inline. `bun run build` + `lint` clean; page prerenders (scanner is dynamic-imported, so SSR is safe).* **⚠️ Still missing: the phone test over LAN HTTPS — which is the entire point of B2.** Command + the `-H` gotcha are in *Environment quick start*. **Teammates: `bun install` in `frontend/` — two new deps.**
+- [~] **B2** · H0.75–H2 — **QR camera spike** · *B — code merged to `main` (`b4696f4`): `frontend/app/spike/scan/page.tsx`. `qr-scanner` (nimiq) decoding, **manual code-entry input beside the camera from day one**, secure-context banner that shows `isSecureContext`/`mediaDevices` so a blocked camera can't be mistaken for a permissions bug, and a commented-out `@zxing/browser` fallback with the swap note inline. `bun run build` + `lint` clean; page prerenders (scanner is dynamic-imported, so SSR is safe).* **⚠️ The phone test over LAN HTTPS — the entire point of B2 — is now one command (`bun run dev:https`) and everything short of holding a phone is verified. See B10.** Command + the `-H` gotcha are in *Environment quick start*. **Teammates: `bun install` in `frontend/` — two new deps.**
 - [~] **B3** · H2–H3 — Booking UI on fixtures · *superseded — B7 landed straight onto the live API, so the fixture stage was skipped. Nothing outstanding.*
 - [x] **B4** · H3–H5 — Booking API · *B — `POST /api/bookings` with overlap validation, role-scoped `GET`, `GET`/`PATCH /:id`. Overlap semantics reused verbatim from `routes/equipment.ts` (inclusive bounds, blocking = PENDING/CONFIRMED/CHECKED_OUT) so the catalogue and the endpoint cannot disagree. Create runs Serializable + bounded retry, so two requests for one window cannot both win. **`bun run test:api:b4` — 67/67.***
   > 📐 **The overlap rule is already written and tested** in `GET /api/equipment?availableFrom=&availableTo=`
@@ -286,8 +286,8 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **B7** · H8–H10 — Client UI live · *B — `/equipment` (filter + availability window + booking dialog), `/bookings`, `/bookings/[id]` with a large QR. The QR is fetched as a **blob with credentials**, not an `<img src>` — the cookie only rides a cross-origin `<img>` while API and app are same-site, so the naive version works on localhost and breaks on the deploy (B10). **`test:api:b7` — 40/40** pins every field these pages read, since `frontend/lib/types.ts` is hand-duplicated and a rename there is a runtime bug, not a compile error.*
 - [x] **B8** · H10–H12 — Admin bookings table · *`/admin/bookings` — status chips + overdue-only + window filters, confirm / cancel, and a dispatch dialog for site + operator + extending the return date. **Confirm renders the QR inline** from `qrDataUrl`, which `POST /:id/confirm` already returned and nothing was reading — so demo step 1–2 no longer needs curl. Two backend gaps had to close first: `GET /api/sites|/api/operators` had **no `clientId` filter**, so the assign dropdowns would have offered every client's yards at once; and `PATCH /:id` checked only that a site *existed*, not that it belonged to this booking's client — a cross-client dispatch was accepted. Both fixed and pinned.*
 - [x] **B9** · H12–H14 — Admin scanner page for real · *`/admin/scanner` — a four-state machine (idle → preview → committed, plus refused), camera and **manual code entry side by side**, both feeding one path. B2's spike is now `components/scan/CameraScanner.tsx`, restyled onto the plate. Check-in prefills the meter from `lastCheckout` and warns if the new reading is *lower* than the check-out one. The camera **pauses** rather than stops while a preview is up — stopping re-prompts for permission on some phones between every scan. All three refusals (rescan cooldown, PENDING booking, already used) render as readable states, and the PENDING 409's `details.booking` is used to still show what was scanned. Location is opt-in, off by default — no permission prompt mid-demo.* ⚠️ **Still laptop-only — see B10.**
-- [ ] **B10** · H14–H15 — Re-test scanner on the **deployed HTTPS URL from a phone** ⛔ *needs A11* — localhost proves nothing
-- [ ] **B11** · H15–H17 — Edge cases: used QR, cancelled booking, `PENDING` rejection, booking detail, overdue badges
+- [~] **B10** · H14–H15 — Re-test scanner from a phone ⛔ *the deployed run still needs A11* · ***but it no longer has to wait for it.*** `cd frontend && bun run dev:https` serves the app over LAN HTTPS in one command. **Everything up to a human holding a phone is verified** — cert covers the LAN IP, page 200s over TLS, sign-in and an authenticated `/api/equipment` both succeed from `https://<LAN-IP>:3000`. **What is left is literally: pick up a phone, open the URL, scan a QR.** Three traps were found and closed doing this — see below.*
+- [x] **B11** · H15–H17 — Edge cases · *all four scanner refusals now render as states with a next step rather than a red string: an already-used QR shows **when it was checked in**, a `PENDING` one gets a **Confirm it** button deep-linking to `/admin/bookings?status=PENDING` (the person holding the scanner is the person who can confirm it), cancelled says the client must rebook, and an unknown code says to retype. Overdue badges on both lists now read the server's `isOverdue` instead of re-deriving the rule in two browsers. Refusal panels are **not** hi-vis — DESIGN.md rule 1, the accent means actionable, so it goes on the button. 24 assertions in `test:api:b8` cover the used-QR / cancelled / grace-day-boundary paths.*
 - [ ] **B12** · H17–H21 — 😴 Sleep
 - [ ] **B13** · H21–H24 — Rehearsal — B drives demo steps 1–3 and 8
 
@@ -439,7 +439,7 @@ bun run test:api:b4     # B4  — booking create, overlap rule, role scoping    
 bun run test:api:b5     # B5  — confirm, QR issuance, qr.png                      32
 bun run test:api:b6     # B6  — scan state machine, double-fire guard             44
 bun run test:api:b7     # B7  — response shapes the client booking pages read     40
-bun run test:api:b8     # B8/B9 — shapes the three ADMIN pages read             111
+bun run test:api:b8     # B8/B9 — shapes the three ADMIN pages read             128
 ```
 
 **`with-test-db` also forces `MAIL_MODE=console`.** `MAIL_MODE` is `resend` with a live
@@ -464,10 +464,37 @@ dashboard for bounces.
 ### Scanner over LAN HTTPS — needed for B2, B9, B10
 
 ```bash
-cd frontend
-bun dev --experimental-https -H <your-LAN-IP>   # e.g. 172.20.196.17 — find it with: ipconfig getifaddr en0
-# then on the phone: https://<your-LAN-IP>:3000/spike/scan
+cd frontend && bun run dev:https      # finds your LAN IP, issues the cert, prints the phone URL
+# then on the phone: https://<LAN-IP>:3000/admin/scanner
 ```
+
+**One manual step**, which the banner prints: add `https://<LAN-IP>:3000` to `CORS_ORIGIN`
+in `backend/.env` and restart it. That variable is also better-auth's `trustedOrigins`
+(`src/lib/auth.ts`), so leaving it out fails **sign-in** with `INVALID_ORIGIN` — not with
+a CORS error, which is why it does not look like a CORS problem.
+
+**Three traps this ran into, all now handled by the script — do not undo them:**
+
+1. **`--experimental-https` silently downgrades to http.** It shells out to `mkcert -install`,
+   which needs sudo to write the CA into the system trust store. With no TTY it fails, and
+   Next prints *"Falling back to http"* **and serves the app anyway**. The server looks
+   healthy, the phone connects, and `navigator.mediaDevices` is undefined — a dead camera
+   with no error. The script issues the cert itself and passes `--experimental-https-key/-cert`,
+   so that branch is unreachable. `mkcert -install` is **not needed**: it only makes the CA
+   trusted on *this* laptop, and the phone warns either way. Tap through — bypassing still
+   gives a secure context.
+2. **`-H` is still not optional** — without it the cert names only `localhost/127.0.0.1/::1`
+   and the phone rejects it outright. The script detects the LAN address (skipping docker and
+   bridge interfaces, which a phone cannot route to) and also **re-checks an existing cert
+   still covers it**, since moving networks silently invalidates one.
+3. **The API is unreachable from a phone, three times over.** `NEXT_PUBLIC_API_URL=http://localhost:4000`
+   is the *phone's* localhost; pointed at the LAN IP instead it is blocked as active mixed
+   content on an https page; and that origin is not in `CORS_ORIGIN`. `dev:https` therefore
+   proxies `/api/*` through Next itself (`API_PROXY_TARGET` in `next.config.ts`) so the page
+   only ever calls its own origin. **Off by default** — plain `bun run dev` is unchanged.
+   This is also the `/api` rewrite `lib/auth-client.ts` names as the A11 cookie escape hatch.
+
+The old throwaway page is still at `/spike/scan`; the real one is `/admin/scanner`.
 
 ⚠️ **The `-H` flag is not optional.** Next only puts `localhost, 127.0.0.1, ::1` in the
 generated cert unless you pass a hostname (`next/dist/lib/mkcert.js` → `createSelfSignedCertificate`),
