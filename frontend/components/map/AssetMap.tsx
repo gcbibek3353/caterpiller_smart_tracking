@@ -8,8 +8,8 @@ const AssetMapInner = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[400px] items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50">
-        <p className="text-sm text-zinc-500">Loading map…</p>
+      <div className="flex h-[400px] items-center justify-center rounded-plate border border-line bg-dust">
+        <p className="stamp text-[11px] text-mute">Loading map…</p>
       </div>
     ),
   },

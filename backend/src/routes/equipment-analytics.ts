@@ -147,6 +147,8 @@ equipmentAnalytics.get("/:id/summary", async (c) => {
             startDate: activeBooking.startDate.toISOString(),
             endDate: activeBooking.endDate.toISOString(),
             status: activeBooking.status,
+            checkoutAt: activeBooking.checkoutAt?.toISOString() ?? null,
+            checkinAt: activeBooking.checkinAt?.toISOString() ?? null,
           }
         : undefined,
     },
@@ -366,6 +368,17 @@ fleetAnalytics.get("/fleet", async (c) => {
     where: { status: { not: "RETIRED" } },
   });
 
+  // "Requires attention" — the open anomalies worth a human glance right now,
+  // most severe and most recent first. Frontend's fixture had this shape
+  // (attentionItems) but nothing served it; equipmentCode lets the dashboard
+  // link straight to the asset page without a second round-trip.
+  const openAnomalies = await prisma.anomaly.findMany({
+    where: { status: "OPEN" },
+    orderBy: [{ severity: "desc" }, { detectedAt: "desc" }],
+    take: 6,
+    include: { equipment: { select: { id: true, code: true } } },
+  });
+
   return c.json({
     data: {
       fleetUtilizationPct: round(fleetUtilization),
@@ -378,6 +391,14 @@ fleetAnalytics.get("/fleet", async (c) => {
       statusDistribution: statusCounts.map((s) => ({
         status: s.status,
         count: s._count.id,
+      })),
+      attentionItems: openAnomalies.map((a) => ({
+        id: a.id,
+        severity: a.severity,
+        title: `${a.type.replace(/_/g, " ")} — ${a.equipment.code}`,
+        description: a.message,
+        equipmentId: a.equipment.id,
+        equipmentCode: a.equipment.code,
       })),
     },
   });

@@ -82,6 +82,8 @@ export interface EquipmentSummary {
     startDate: string;
     endDate: string;
     status: string;
+    checkoutAt: string | null;
+    checkinAt: string | null;
   };
 }
 
@@ -119,6 +121,7 @@ export interface FleetDashboardData {
     severity: "LOW" | "MEDIUM" | "HIGH";
     title: string;
     description: string;
+    equipmentId: string;
     equipmentCode: string;
   }>;
 }

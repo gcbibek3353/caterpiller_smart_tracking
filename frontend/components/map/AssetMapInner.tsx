@@ -35,10 +35,10 @@ export function AssetMapInner({
   const path: [number, number][] = breadcrumb.map((p) => [p.lat, p.lng]);
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
-      <div className="border-b border-zinc-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-zinc-800">GPS Track</h3>
-        {geofence?.label && <p className="mt-0.5 text-xs text-zinc-500">{geofence.label}</p>}
+    <div className="overflow-hidden rounded-plate border border-line bg-plate">
+      <div className="border-b border-line px-4 py-3">
+        <h3 className="stamp text-[11px] text-ink">GPS Track</h3>
+        {geofence?.label && <p className="mt-0.5 text-[12px] text-mute">{geofence.label}</p>}
       </div>
       <div style={{ height }}>
         <MapContainer
@@ -55,15 +55,15 @@ export function AssetMapInner({
             <Circle
               center={[geofence.lat, geofence.lng]}
               radius={geofence.radiusMeters}
-              pathOptions={{ color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.1, weight: 2 }}
+              pathOptions={{ color: "#2b5f8a", fillColor: "#2b5f8a", fillOpacity: 0.1, weight: 2 }}
             >
               <Tooltip permanent direction="center">
-                <span className="text-xs font-medium text-blue-700">{geofence.label ?? "Site"}</span>
+                <span className="stamp text-[10px] text-busy">{geofence.label ?? "Site"}</span>
               </Tooltip>
             </Circle>
           )}
           {path.length > 1 && (
-            <Polyline positions={path} pathOptions={{ color: "#f97316", weight: 4, opacity: 0.85 }} />
+            <Polyline positions={path} pathOptions={{ color: "#ff6b1a", weight: 4, opacity: 0.85 }} />
           )}
           {currentPosition && (
             <Marker position={[currentPosition.lat, currentPosition.lng]} icon={markerIcon}>
