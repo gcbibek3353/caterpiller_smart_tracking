@@ -183,19 +183,37 @@ r = await commit(admin, confirmed.token);
 check("  commit refused too → 409", r.status === 409, `got ${r.status}`);
 
 console.log("\n── double-tap cannot double-fire ──");
-const race = await mkBooking({ confirm: true });
-const fired = await Promise.all([
-  commit(admin, race.token, { meterHours: 10 }),
-  commit(admin, race.token, { meterHours: 10 }),
-  commit(admin, race.token, { meterHours: 10 }),
-  commit(admin, race.token, { meterHours: 10 }),
-]);
-const won = fired.filter((x) => x.status === 200).length;
-check("exactly ONE of 4 concurrent commits wins", won === 1, `${won} won: ${fired.map((x) => x.status).join(",")}`);
-check("  no commit slipped through as a CHECK_IN", fired.every((x) => x.status !== 200 || x.body?.data?.action === "CHECK_OUT"), fired.map((x) => x.body?.data?.action).join(","));
-check("  exactly one CheckEvent written", (await prisma.checkEvent.count({ where: { bookingId: race.id } })) === 1);
-const raceRow = await prisma.booking.findUniqueOrThrow({ where: { id: race.id } });
-check("  booking is CHECKED_OUT, not double-advanced", raceRow.status === "CHECKED_OUT", raceRow.status);
+/**
+ * Repeated on purpose. This is a timing race: with the cooldown removed it
+ * reproduces in roughly one round out of twelve, so a single round is not a
+ * regression guard — it is a coin flip that usually says "fine". Several
+ * rounds of higher concurrency make a reintroduced bug fail the suite
+ * reliably rather than on demo day.
+ */
+const RACE_ROUNDS = 6, RACE_CONCURRENCY = 8;
+let raceBad = 0;
+const raceDetail: string[] = [];
+for (let i = 0; i < RACE_ROUNDS; i++) {
+  const race = await mkBooking({ confirm: true });
+  const fired = await Promise.all(
+    Array.from({ length: RACE_CONCURRENCY }, () => commit(admin, race.token, { meterHours: 10 })),
+  );
+  const won = fired.filter((x) => x.status === 200);
+  const events = await prisma.checkEvent.count({ where: { bookingId: race.id } });
+  const row = await prisma.booking.findUniqueOrThrow({ where: { id: race.id } });
+  const bad: string[] = [];
+  if (won.length !== 1) bad.push(`${won.length} winners`);
+  if (events !== 1) bad.push(`${events} events`);
+  if (row.status !== "CHECKED_OUT") bad.push(`status=${row.status}`);
+  if (row.checkinAt !== null) bad.push("checkinAt set");
+  if (won.some((x) => x.body?.data?.action !== "CHECK_OUT")) bad.push("a CHECK_IN slipped through");
+  if (bad.length) { raceBad++; raceDetail.push(`round ${i + 1}: ${bad.join(", ")}`); }
+}
+check(
+  `${RACE_ROUNDS} rounds × ${RACE_CONCURRENCY} concurrent commits — exactly one winner each, none double-advanced`,
+  raceBad === 0,
+  raceDetail.join(" | "),
+);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 await prisma.$disconnect();
