@@ -16,7 +16,15 @@ export interface AnomalyCandidate {
   dedupeKey: string;
 }
 
-/** Mirrors the Prisma DailyUsage model's relevant fields — one row per equipment per day. */
+/**
+ * One row per equipment per day. Most fields are native `DailyUsage`
+ * columns (verified against backend/prisma/schema.prisma). `bookingStatus`
+ * and `siteId` are NOT columns on `DailyUsage` itself — they live on the
+ * related `Booking` — so the runner must join/flatten them in, e.g.
+ * `prisma.dailyUsage.findMany({ include: { booking: { select: { status: true, siteId: true } } } })`
+ * then spread `booking.status`/`booking.siteId` onto each row before
+ * calling these detectors.
+ */
 export interface DailyUsageLike {
   equipmentId: string;
   bookingId?: string | null;
@@ -29,7 +37,9 @@ export interface DailyUsageLike {
   fuelUsedPct: number;
   fuelPerHour: number | null;
   hasOperator: boolean;
+  /** Joined from `booking.status` — see class doc. */
   bookingStatus?: "PENDING" | "CONFIRMED" | "CHECKED_OUT" | "RETURNED" | "CANCELLED";
+  /** Joined from `booking.siteId` — see class doc. */
   siteId?: string | null;
 }
 

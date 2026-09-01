@@ -9,8 +9,17 @@ export type EquipmentType =
   | "COMPACTOR"
   | "FORKLIFT";
 
-/** Minimal booking shape the series builder needs — matches the Prisma Booking model's relevant fields. */
+/**
+ * Minimal booking shape the series builder needs. `startDate`/`endDate`/
+ * `status` are native `Booking` columns (verified against
+ * backend/prisma/schema.prisma). `equipmentType` is NOT a column on
+ * `Booking` — it lives on the related `Equipment` — so the runner must
+ * join/flatten it in, e.g.
+ * `prisma.booking.findMany({ include: { equipment: { select: { type: true } } } })`
+ * then map `equipment.type` to `equipmentType` on each row.
+ */
 export interface BookingLike {
+  /** Joined from `equipment.type` — see class doc. */
   equipmentType: EquipmentType;
   startDate: Date;
   endDate: Date;
