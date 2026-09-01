@@ -33,15 +33,16 @@
 | **B** | **B5/B6 — confirm, QR, scan** | ✅ `requireRole("ADMIN")` and `ScanCommitInput` ready (still stub `sendMail()` until D4) |
 | **C** | **C4 — Ingest + rollup** | ✅ `requireApiKey` + `IngestInput` (accepts bare array *or* `{ticks:[]}`) ready |
 | **D** | **D4 — Mailer** | ✅ `Notification` model live |
-| **A** | A8 — **the seed script** | Next on A's list; nothing blocks it |
+| **C** | **C7 — asset page charts** | ✅ **Seeded data exists** — 54k ticks, 21 days, real fuel saw-tooth |
+| **D** | **D5 — detector runner** | ✅ Seeded data has **4 real injected faults** to fire on |
+| **D** | **D6 — forecast runner** | ✅ 12 months of demand with trend + seasonality to learn |
+| **A** | A10 — frontend shell + auth pages | A9 needs C4 first |
 
 ## 🚧 Blocked right now
 
 | Task | Waiting on |
 |---|---|
-| B5 confirm + QR email | A5 (ADMIN guard) · D4 (`sendMail`) — **stub the mail call, don't wait** |
-| C7 asset page charts | A8 (seeded data) |
-| D5 detector runner · D6 forecast runner | A8 (seeded data) |
+| B5 confirm + QR email | D4 (`sendMail`) — **stub the mail call, don't wait** |
 | A9 real rollup in seed | C4 (rollup service) |
 | B10 phone scanner re-test | A11 (deploy) |
 | C12 asset timeline | D5 (anomalies exist) |
@@ -90,6 +91,36 @@ New signups are **always CLIENT** — `role` is `input: false`, so it can't be s
 
 ---
 
+## 🌱 The seeded database — what's in it for you
+
+```bash
+cd backend && bun run seed        # ~12s, wipes and rebuilds. Re-run whenever.
+bun run seed:verify               # asserts the data still has real structure
+bun run db:restore                # restore prisma/snapshot.sql in ~1s (demo parachute)
+```
+
+Logins: `admin@rental.com / admin123` · `client@build.com / client123`
+
+| For | What's there |
+|---|---|
+| **C** (asset page) | 54k ticks at 10-min resolution over the **last 21 days**. Fuel saw-tooths with real refuels, temp tracks engine state (OFF 28 °C · IDLE 66 °C · WORKING 82 °C). ~17 machines `CHECKED_OUT` right now. |
+| **D** (forecast) | 639 bookings over 12 months carrying **trend +15%/yr**, an annual cycle with a **~40% monsoon trough** (peak/trough 3.6×), weekday effects (Mon 165 starts vs Sun 12), and a type-mix shift. **GRADER peaks at 88% utilisation** in road season (→ shortage recommendation) while **LOADER sits at 56%** (→ surplus). Weekly peaks hit 100%. |
+| **D** (anomalies) | **Four faults deliberately injected** so your detectors find real signals: `BLD-0003` overheats to 115 °C · `EXC-0012` idles all day for 5 days · `LDR-0001` 4 days zero runtime · `CRN-0003` fuel siphon. Plus 52 bookings with **no operator** and 39 late returns. |
+| **B** (bookings) | 639 bookings across all 5 statuses. **No machine is ever double-booked** — asserted in `seed:verify`. |
+
+⚠️ **`bun run test:api` truncates the database.** Run it *before* seeding, or re-seed after.
+
+### 📐 One semantic D needs to decide
+`endDate` is stored at **midnight UTC of the last rental day**, and the availability
+rule treats it as **inclusive** (a booking ending the 10th blocks a booking starting
+the 10th). So the naive `OVERDUE` rule `now > endDate` fires at 00:01 on the return
+day, before the machine could possibly be back. **Use `now > endDate + 1 day`** — or
+the demo shows every active rental as overdue. The seed follows the inclusive reading:
+on-time returns land in business hours *of* `endDate`; the 39 genuinely-late ones are
+a calendar day or more past it.
+
+---
+
 ## Decisions locked in A1 — do not relitigate
 
 | Decision | Value |
@@ -123,7 +154,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **A5** · H3–H4 — better-auth · *mounted at `/api/auth/*`. Guards in `src/middleware/auth.ts`: `requireAuth`, `optionalAuth`, `requireRole(...)`, `requireApiKey`, `assertCanSeeEquipment`, `assertCanSeeBooking`. Verified end-to-end: signup, signin, signout deletes the session row, stale cookie 401s, untrusted origin rejected, `role` escalation at signup blocked.*
 - [x] **A6** · H4–H4.5 — Hono hardening · *CORS `credentials:true`, error envelope (Zod + Prisma P2002/P2025), `/health`, and `validate()` / `valid()` in `src/middleware/validate.ts`.*
 - [x] **A7** · H4.5–H5.5 — Equipment / Site / Operator CRUD · *`/api/equipment`, `/api/sites`, `/api/operators`. Availability overlap + soft delete + cross-client isolation. **28 API tests pass** — `bun run test:api`.*
-- [ ] **A8** · H5.5–H9 — **`prisma/seed.ts`** — highest-leverage file in the repo. 1 admin + 5 clients (create via better-auth signup so hashing matches), ~40 machines lopsided mix, sites + operators, ~600 bookings with trend + annual seasonality + weekday effects, `DailyUsage` 12 months, raw `Telemetry` **last 21 days only**. Under 90s, re-runnable. **Then `pg_dump` and commit the `.sql`.**
+- [x] **A8** · H5.5–H9 — **`prisma/seed.ts`** · ***12.3s** (budget was 90s). 6 users, 40 machines, 639 bookings, 54k ticks, 7.7k DailyUsage, 1.1k check events. **Re-runnable and deterministic** — 3 consecutive runs give byte-identical data. Snapshot committed at `prisma/snapshot.sql` (9.4 MB, restores in 1.1s). 13 structure assertions pass via `bun run seed:verify`.*
 - [ ] **A9** · H9–H9.5 — Swap in C's real rollup for the last 21 days ⛔ *needs C4; skip if late*
 - [ ] **A10** · H9.5–H11 — Frontend shell + auth pages, `authClient`, protected-route wrapper, typed `apiFetch()` with `credentials:'include'`
 - [ ] **A11** · H11–H13 — **Deploy** (budget the full 2h — the cross-origin session cookie is the trap)
@@ -200,7 +231,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 
 - [~] **H0.75** — Schema + endpoint contract signed off · *schema ✅ · decision table drafted, awaiting B/C/D sign-off*
 - [x] **H2.5** — A pushes `schema.prisma`, `prisma generate` works → unblocks B4, C4, D4
-- [ ] **H9** — Seeded DB exists, everyone pulls → unblocks C7, D5, D6
+- [x] **H9** — **Seeded DB exists** → C7, D5, D6 are unblocked. `cd backend && bun run seed` (12s).
 - [ ] **H18** — **Feature freeze** → integration only
 
 ## Never cut
