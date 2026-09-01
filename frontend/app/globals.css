@@ -76,3 +76,9 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* C11/C7's charts set an explicit pixel height on this wrapper —
+   ResponsiveContainer needs a parent with a real height to size into. */
+.chart-container {
+  width: 100%;
+}

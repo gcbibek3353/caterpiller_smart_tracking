@@ -1,0 +1,46 @@
+{
+  "fleetUtilizationPct": 68.4,
+  "machinesOut": 12,
+  "totalMachines": 38,
+  "overdueCount": 2,
+  "availableCount": 18,
+  "maintenanceCount": 4,
+  "revenue": 2847500,
+  "statusDistribution": [
+    { "status": "CHECKED_OUT", "count": 12 },
+    { "status": "AVAILABLE", "count": 18 },
+    { "status": "MAINTENANCE", "count": 4 },
+    { "status": "RESERVED", "count": 3 },
+    { "status": "RETIRED", "count": 1 }
+  ],
+  "attentionItems": [
+    {
+      "id": "att_1",
+      "severity": "HIGH",
+      "title": "GEOFENCE_BREACH — EXC-1007",
+      "description": "Equipment left Site S003 at 02:00 UTC",
+      "equipmentCode": "EXC-1007"
+    },
+    {
+      "id": "att_2",
+      "severity": "MEDIUM",
+      "title": "Overdue return — CRN-0023",
+      "description": "Expected return was 2026-08-30",
+      "equipmentCode": "CRN-0023"
+    },
+    {
+      "id": "att_3",
+      "severity": "MEDIUM",
+      "title": "High idle ratio — BLD-0011",
+      "description": "Idle ratio 62% over last 3 days",
+      "equipmentCode": "BLD-0011"
+    },
+    {
+      "id": "att_4",
+      "severity": "LOW",
+      "title": "Maintenance due — GRD-0004",
+      "description": "Scheduled service in 2 days",
+      "equipmentCode": "GRD-0004"
+    }
+  ]
+}

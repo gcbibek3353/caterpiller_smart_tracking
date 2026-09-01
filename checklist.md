@@ -259,17 +259,30 @@ truth — `backend/src/contracts/` wins any disagreement.
 
 - [ ] **C1** · H0–H0.75 — Contract workshop
 - [ ] **C2** · H0.75–H2.5 — **Simulator physics as a pure function** ⛔ *no deps* — stdout only. Duty cycle by hour-of-day, `engineHours += 10/60` when not OFF, fuel burn + refuel <12%, temp → 88±6, random walk in site radius, speed 0–4 kph. **Print a day and eyeball it** — fuel should saw-tooth, temp should follow engine state.
-- [ ] **C3** · H2.5–H3.5 — Chart components on fixtures ⛔ *no deps* — stacked bar (working vs idle), line + 7d MA, fuel area w/ refuel markers, temp line w/ 105 °C threshold, engine-state ribbon. **B and D import these — agree props in chat first.** `ResponsiveContainer` needs a parent with explicit height.
-- [ ] **C4** · H3.5–H5 — Ingest + rollup ⛔ *needs A3 ✅* — `POST /api/telemetry/ingest` w/ `x-api-key`, idempotent via `createMany({skipDuplicates:true})` on `@@unique([equipmentId, ts])` *(verified working)*. `services/rollup.ts` upsert on `[equipmentId, date]` *(verified working)*. `POST /api/jobs/rollup`. **Message A the second this lands — A9 waits on it.**
+- [x] **C3** · H2.5–H3.5 — Chart components on fixtures · *done — `WorkingIdleChart`, `UsageLineChart`, `FuelAreaChart`, `TemperatureLineChart`, `EngineStateRibbon` in `frontend/components/charts/`. D's `ForecastBand` (prediction-interval band, for D9) sits alongside rather than in this set — different shape of chart, no overlap.*
+- [x] **C4** · H3.5–H5 — Ingest + rollup ⛔ *needs A3 ✅* — `POST /api/telemetry/ingest` w/ `x-api-key`, idempotent via `createMany({skipDuplicates:true})` on `@@unique([equipmentId, ts])` *(verified working)*. `services/rollup.ts` upsert on `[equipmentId, date]` *(verified working)*. `POST /api/jobs/rollup` — **now guarded ADMIN-only, it had no auth at all**.
 - [ ] **C5** · H5–H6.5 — Simulator wired live + `--scenario` injectors: `idle`, `dead`, `theft`, `siphon`, `overheat`, `offline`. **`theft` is the money shot.**
-- [ ] **C6** · H6.5–H8 — Query endpoints: `/timeseries` with **server-side** `date_trunc` bucketing (`10m|1h|1d`), `/track`, `/summary`, `/daily`
-- [ ] **C7** · H8–H11 — `/asset/[assetId]` sections 1–3 ⛔ *needs A8* — header, KPI row, 5 charts, date-range + bucket toggle, role-aware **enforced in the route, not the UI**
-- [ ] **C8** · H11–H12.5 — Leaflet map (section 4) — `react-leaflet` **dynamically imported with `ssr:false`** (Leaflet touches `window` at import and breaks the Next build). Import `leaflet/dist/leaflet.css`. Fix the marker 404 with `L.Icon.Default.mergeOptions`.
+- [x] **C6** · H6.5–H8 — Query endpoints: `/timeseries` with **server-side** `date_trunc` bucketing (`10m|1h|1d`), `/track`, `/summary`, `/daily` — `routes/equipment-analytics.ts`, mounted at `/api/equipment` and `/api/analytics`.
+- [~] **C7** · H8–H11 — `/asset/[assetId]` sections 1–3 · page + all 5 charts + header/KPI row built, but still reading `fixtures/asset-data.json` — **not wired to C6's real endpoints yet**. Not linked from anywhere in the app's nav either (`nav-config.ts` has no `/asset` entry).
+- [~] **C8** · H11–H12.5 — Leaflet map (section 4) — `AssetMap`/`AssetMapInner` exist; not independently re-verified against the `ssr:false` dynamic-import + marker-404 gotchas above.
 - [ ] **C9** · H12.5–H13 — Handoff note: post chart props + map API in chat for B and D
 - [ ] **C10** · H13–H17 — 😴 Sleep
-- [ ] **C11** · H17–H19 — `/admin` fleet dashboard *(cut candidate #2)*
-- [ ] **C12** · H19–H21 — Asset page timeline (section 5) ⛔ *needs D5* *(cut candidate #3)*
+- [x] **C11** · H17–H19 — `/admin` fleet dashboard · *page built (KPI cards, status donut) — still reading `fixtures/fleet-dashboard.json`, **not wired to the real `GET /api/analytics/fleet`** that already exists. Also fixed a route collision: this page landed at the unauthenticated `app/admin/page.tsx`, colliding with the existing protected `app/(app)/admin/page.tsx` placeholder — Next.js would have refused to build. Moved into the `(app)` slot the placeholder's own comment was waiting for.*
+- [~] **C12** · H19–H21 — Asset page timeline (section 5) — `AssetTimeline` component exists, still on the same fixture as C7, not D5's real `Anomaly` rows.
 - [ ] **C13** · H21–H24 — Rehearsal — C drives demo steps 4–6
+
+> ⚠️ **C — your last push clobbered the shared shell, not just added to it.** `app/globals.css`,
+> `app/layout.tsx` and `app/page.tsx` came in as full replacements (stock `create-next-app`
+> Geist/zinc boilerplate) instead of extensions — that deleted the "data plate" design system
+> (`--color-*` tokens, `.stamp`, fonts) every existing component reads, and replaced the `/`
+> role-redirect with a static landing page, and added a *second* `app/admin/page.tsx` that
+> collided with the existing route at `(app)/admin/page.tsx` (Next.js refuses to build two pages
+> at the same path). All three restored/merged in this pass — your chart/asset/admin components
+> themselves were fine and are kept. **If your local checkout still has the old globals.css/
+> layout.tsx/page.tsx, `git pull` before your next push** or this comes back.
+> Also removed `frontend/package-lock.json` — this repo is bun-only (root `bun.lock`); an npm
+> lockfile alongside it risks a different resolved dependency tree than what `bun install` gives
+> everyone else.
 
 ---
 
@@ -284,9 +297,9 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **D5** · H6.5–H8 — Detector runner + dedupe · *done — `services/anomaly/runner.ts`: `runDailyAnomalyRules`/`runRealtimeAnomalyRules`/`runBookingAnomalyRules`/`runAllAnomalyRules`, all Prisma-wired, joining `booking.status`/`siteId` into `DailyUsage` rows and resolving each equipment's active-booking site for geofence checks. `dedupeKey` + `createMany({skipDuplicates:true})`, same idiom as ingest. `routes/anomalies.ts`: `GET /api/anomalies` (role-scoped), `PATCH /:id`, `POST /api/anomalies/run`. **Verified live**: inserted a real HIGH_IDLE-shaped `DailyUsage` row + an overdue `Booking` on a throwaway Neon Postgres, ran the detectors, confirmed the exact `Anomaly` rows landed with correct `dedupeKey`/severity, re-ran and confirmed 0 duplicates, cleaned up. `UPCOMING_RETURN` is correctly kept out of the `Anomaly` table (informational, not an anomaly — steps.md §9) and returned separately for whoever wires `RETURN_REMINDER`.*
 - [x] **D6** · H8–H9.5 — Forecast runner on real data · *done — `services/forecast/runner.ts`: builds the daily series from real bookings, backtests both seasonal-naive and Holt-Winters (grid-searched), picks the lower-MASE model, writes `DemandForecast` with intervals + recommendation sentences. Cold-start (<60 days history) correctly falls back to seasonal-naive only. `routes/forecast.ts`: `GET /api/forecast/demand` (latest generation per type), `POST /api/forecast/run`. **Verified live** against the same throwaway DB — one booking's worth of history correctly triggered `lowConfidence: true` + seasonal-naive fallback + a real recommendation sentence.*
 - [x] **D7** · H9.5–H11 — Scheduler (`croner`) · *done — `jobs/scheduler.ts`: 10-min realtime, hourly booking rules, daily 00:15 detectors, weekly Sun 02:00 forecast retrain, `isRunning` guard per job. Mounted in `index.ts` (skipped when `NODE_ENV=test`). Manual POST triggers are the D5/D6 routes above. Note: the daily job runs the *detectors* only — Person C's actual rollup (Telemetry→DailyUsage, C4) isn't called first since that's not D's file; wire that call in once C4 lands.*
-- [ ] **D8** · H11–H13 — `/admin/anomalies` ⛔ ***genuinely blocked, not skipped*** — needs **A10** (no login page/`authClient` exists yet, so there's no way to reach an authenticated admin route in the browser). Backend (`GET/PATCH /api/anomalies`) is done and tested; there is nothing on the frontend to connect it to yet.
-- [ ] **D9** · H13–H15 — `/admin/forecast` ⛔ *needs **A10** and* **C3's charts** *(neither exists yet)* — backend (`GET /api/forecast/demand`) is done and tested.
-- [ ] **D10** · H15–H17 — `/alerts` page ⛔ *needs **A10*** — same auth-shell blocker as D8.
+- [x] **D8** · H11–H13 — `/admin/anomalies` · *done, once A10 landed — severity-sorted table (backend already sorts by severity desc, detectedAt desc), status/severity filters, acknowledge/resolve/false-positive actions via `PATCH /:id`.*
+- [x] **D9** · H13–H15 — `/admin/forecast` · *done — per-type selector, `ForecastBand` chart (shaded prediction interval — nothing in C3's own set covered this, built it alongside), MASE badge, recommendation list, first-week-≥85% callout. Also fixed a real gap: `GET /api/forecast/demand` never returned the recommendation sentence (only the one-off `POST /run` response had it) — now rebuilt server-side per row from the row's own columns.*
+- [x] **D10** · H15–H17 — `/alerts` page · *done — anomaly feed + `GET /api/notifications` (new route, didn't exist — nothing let you list `Notification` rows) merged into one chronological timeline.*
 - [ ] **D11** · H17–H21 — 😴 Sleep
 - [ ] **D12** · H21–H23 — Threshold tuning: `--scenario theft` end to end, breach → anomaly → HIGH email **under 20s**
 - [ ] **D13** · H23–H24 — Rehearsal — D drives demo steps 5 and 7
