@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useApi } from "@/lib/use-api";
 import { api, ApiError } from "@/lib/api";
 import type { Anomaly, AnomalyStatus, Paginated, Severity } from "@/lib/types";
@@ -14,12 +15,37 @@ const SEVERITY_OPTIONS: (Severity | "")[] = ["", "HIGH", "MEDIUM", "LOW"];
 const selectClass =
   "rounded-plate border border-line bg-plate px-3 py-2 font-mono text-stamp-lg text-ink focus:border-ink";
 
-/** D8 — severity-sorted anomaly table with filters and the ack/resolve/false-positive actions. */
+const SEVERITY_ROW_TINT: Record<Severity, string> = {
+  HIGH: "border-l-alert bg-alert/[0.04]",
+  MEDIUM: "border-l-warn bg-warn/[0.04]",
+  LOW: "border-l-mute bg-transparent",
+};
+
+function KpiCard({ label, value, tone }: { label: string; value: number; tone: "alert" | "warn" | "mute" }) {
+  const toneClass = { alert: "text-alert", warn: "text-warn", mute: "text-mute" }[tone];
+  return (
+    <div className="rounded-plate border border-line bg-plate p-4">
+      <p className="stamp text-stamp-sm text-mute">{label}</p>
+      <p className={`mt-1.5 text-data-2xl font-semibold ${toneClass}`}>{value}</p>
+    </div>
+  );
+}
+
+/** D8 — severity-sorted anomaly table with filters, real equipment identity, and the ack/resolve/false-positive actions. */
 export default function AdminAnomalies() {
   const [status, setStatus] = useState<AnomalyStatus | "">("OPEN");
   const [severity, setSeverity] = useState<Severity | "">("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Unfiltered open-severity counts for the summary strip — independent of
+  // whatever the table's own filters are currently set to.
+  const summary = useApi<Paginated<Anomaly>>("/api/anomalies", { status: "OPEN", limit: 200 });
+  const openBySeverity = useMemo(() => {
+    const counts: Record<Severity, number> = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+    for (const a of summary.data?.items ?? []) counts[a.severity]++;
+    return counts;
+  }, [summary.data]);
 
   const { data, error, loading, refetch } = useApi<Paginated<Anomaly>>("/api/anomalies", {
     status: status || undefined,
@@ -32,7 +58,7 @@ export default function AdminAnomalies() {
     setActionError(null);
     try {
       await api.patch(`/api/anomalies/${id}`, { status: next });
-      await refetch();
+      await Promise.all([refetch(), summary.refetch()]);
     } catch (e) {
       setActionError(e instanceof ApiError ? e.message : "Could not update this anomaly");
     } finally {
@@ -79,6 +105,12 @@ export default function AdminAnomalies() {
         </div>
       </header>
 
+      <div className="mb-6 grid grid-cols-3 gap-4">
+        <KpiCard label="Open · High" value={openBySeverity.HIGH} tone="alert" />
+        <KpiCard label="Open · Medium" value={openBySeverity.MEDIUM} tone="warn" />
+        <KpiCard label="Open · Low" value={openBySeverity.LOW} tone="mute" />
+      </div>
+
       {actionError ? (
         <p className="mb-4 border-l-2 border-alert bg-alert/6 px-4 py-3 text-body text-alert">{actionError}</p>
       ) : null}
@@ -107,12 +139,17 @@ export default function AdminAnomalies() {
             </thead>
             <tbody>
               {items.map((a) => (
-                <tr key={a.id} className="border-b border-line/60 last:border-0">
+                <tr key={a.id} className={`border-b border-l-2 border-line/60 last:border-b-0 ${SEVERITY_ROW_TINT[a.severity]}`}>
                   <td className="px-4 py-3">
                     <StatusPill status={a.severity} kind="severity" />
                   </td>
                   <td className="px-4 py-3 font-mono text-stamp-lg">{a.type.replace(/_/g, " ")}</td>
-                  <td className="px-4 py-3 font-mono text-stamp-lg text-mute">{a.equipmentId.slice(0, 10)}…</td>
+                  <td className="px-4 py-3">
+                    <Link href={`/asset/${a.equipmentId}`} className="group flex flex-col leading-tight hover:text-hivis">
+                      <span className="font-mono text-stamp-lg text-ink group-hover:text-hivis">{a.equipmentCode}</span>
+                      <span className="stamp text-stamp-xs text-mute">{a.equipmentType.replace(/_/g, " ")}</span>
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 font-mono text-stamp-lg text-mute">
                     {new Date(a.detectedAt).toLocaleString()}
                   </td>

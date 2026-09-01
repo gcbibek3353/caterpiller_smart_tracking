@@ -33,15 +33,26 @@ anomalyRoutes.get("/", requireAuth, validate("query", AnomalyListQuery), async (
     where.equipmentId = q.equipmentId ? { in: ownIds.filter((id) => id === q.equipmentId) } : { in: ownIds };
   }
 
-  const [items, total] = await Promise.all([
+  const [rows, total] = await Promise.all([
     prisma.anomaly.findMany({
       where,
       orderBy: [{ severity: "desc" }, { detectedAt: "desc" }],
       skip: (q.page - 1) * q.limit,
       take: q.limit,
+      include: { equipment: { select: { code: true, name: true, type: true } } },
     }),
     prisma.anomaly.count({ where }),
   ]);
+
+  // Flattened, not nested — the frontend table was reading equipmentId.slice(0,10)
+  // for lack of anything better; a raw cuid fragment tells nobody which machine fired.
+  const items = rows.map((r) => ({
+    ...r,
+    equipmentCode: r.equipment.code,
+    equipmentName: r.equipment.name,
+    equipmentType: r.equipment.type,
+    equipment: undefined,
+  }));
 
   return ok(c, { items, page: q.page, limit: q.limit, total });
 });

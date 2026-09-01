@@ -121,13 +121,21 @@ export type Anomaly = {
   status: AnomalyStatus;
   dedupeKey: string;
   notifiedAt: string | null;
+  /** Joined server-side — see routes/anomalies.ts. */
+  equipmentCode: string;
+  equipmentName: string;
+  equipmentType: EquipmentType;
 };
 
-export type ForecastModel = "holt-winters" | "seasonal-naive" | "ridge";
+export type ForecastModel = "holt-winters" | "seasonal-naive" | "gbm-lag";
 
 export type DemandForecast = {
   id: string;
   equipmentType: EquipmentType;
+  /** null = company-wide aggregate for this equipment type. */
+  siteId: string | null;
+  /** Joined server-side from Site.name — null when siteId is null. */
+  siteName: string | null;
   /** ISO date (Monday of the forecast week), e.g. "2026-09-07". */
   periodStart: string;
   horizonWeek: number;
@@ -140,10 +148,14 @@ export type DemandForecast = {
   gapUnits: number;
   model: ForecastModel;
   mase: number | null;
+  /** Below the minimum-history threshold — a real backtested pick wasn't attempted. */
+  lowConfidence: boolean;
   generatedAt: string;
   /** Rebuilt server-side from the row's own columns — see routes/forecast.ts. */
   recommendation: string;
 };
+
+export type ForecastSite = { id: string; name: string };
 
 export type NotificationStatus = "PENDING" | "SENT" | "FAILED";
 
