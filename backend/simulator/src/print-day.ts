@@ -14,11 +14,11 @@ let equipmentCode = "EQX1007";
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--scenario" && args[i + 1]) {
-    scenario = parseScenario(args[++i]);
+    scenario = parseScenario(args[++i]!);
   } else if (args[i] === "--seed" && args[i + 1]) {
-    seed = parseInt(args[++i], 10);
+    seed = parseInt(args[++i]!, 10);
   } else if (args[i] === "--equipment" && args[i + 1]) {
-    equipmentCode = args[++i];
+    equipmentCode = args[++i]!;
     equipmentId = `eq_${equipmentCode.toLowerCase()}`;
   }
 }

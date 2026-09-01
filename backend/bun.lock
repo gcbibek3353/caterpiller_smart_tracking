@@ -6,7 +6,7 @@
       "name": "backend",
       "dependencies": {
         "@hono/zod-validator": "^0.4.3",
-        "@prisma/client": "^6.5.0",
+        "@prisma/client": "^6.19.3",
         "better-auth": "^1.7.2",
         "croner": "^10.0.1",
         "hono": "^4.7.4",

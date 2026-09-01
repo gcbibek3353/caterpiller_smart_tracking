@@ -70,7 +70,7 @@ async function ingestBatch(ticks: TelemetryOutput[]) {
     body: JSON.stringify({ ticks }),
   });
 
-  const json = await res.json();
+  const json = (await res.json()) as { data?: { inserted?: number; skipped?: number } };
   if (!res.ok) {
     console.error("Ingest failed:", json);
     return;
