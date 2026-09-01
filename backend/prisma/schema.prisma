@@ -1,0 +1,378 @@
+// Smart Rental Tracking System — data model
+//
+// ⚠️  Only Person A edits this file. Need a field? Message A.
+// All DateTimes are stored UTC. Convert at the edges only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────────────────────────────────────
+// Enums
+// ───────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  CLIENT
+}
+
+enum EquipmentType {
+  EXCAVATOR
+  CRANE
+  BULLDOZER
+  GRADER
+  LOADER
+  BACKHOE
+  DUMP_TRUCK
+  COMPACTOR
+  FORKLIFT
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  RESERVED
+  CHECKED_OUT
+  MAINTENANCE
+  RETIRED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_OUT
+  RETURNED
+  CANCELLED
+}
+
+enum CheckType {
+  CHECK_OUT
+  CHECK_IN
+}
+
+enum EngineState {
+  OFF
+  IDLE
+  WORKING
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AnomalyStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+// ───────────────────────────────────────────────────────────
+// better-auth core models
+// `User` carries our domain fields (role/companyName/phone) as
+// better-auth `additionalFields`.
+// ───────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // domain additions
+  role        Role    @default(CLIENT)
+  companyName String?
+  phone       String?
+
+  sessions      Session[]
+  accounts      Account[]
+  bookings      Booking[]      @relation("ClientBookings")
+  sites         Site[]
+  operators     Operator[]
+  scans         CheckEvent[]   @relation("ScannedBy")
+  notifications Notification[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ───────────────────────────────────────────────────────────
+// Domain
+// ───────────────────────────────────────────────────────────
+
+model Site {
+  id           String  @id @default(cuid())
+  name         String
+  address      String?
+  lat          Float
+  lng          Float
+  radiusMeters Int     @default(500) // geofence
+  clientId     String
+  client       User    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  bookings Booking[]
+
+  @@index([clientId])
+}
+
+model Operator {
+  id        String  @id @default(cuid())
+  name      String
+  licenseNo String?
+  phone     String?
+  clientId  String
+  client    User    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  bookings Booking[]
+
+  @@index([clientId])
+}
+
+model Equipment {
+  id            String          @id @default(cuid())
+  code          String          @unique // "EXC-0007"
+  name          String
+  type          EquipmentType
+  make          String?
+  model         String?
+  year          Int?
+  status        EquipmentStatus @default(AVAILABLE)
+  dailyRate     Decimal         @db.Decimal(10, 2)
+  hourlyRate    Decimal?        @db.Decimal(10, 2)
+  meterHours    Float           @default(0) // lifetime engine hours
+  fuelCapacityL Int             @default(300)
+  homeLat       Float // depot location
+  homeLng       Float
+  imageUrl      String?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  bookings   Booking[]
+  telemetry  Telemetry[]
+  dailyUsage DailyUsage[]
+  anomalies  Anomaly[]
+
+  @@index([type, status])
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  code        String        @unique // "BK-2026-000418"
+  equipmentId String
+  clientId    String
+  siteId      String?
+  operatorId  String?
+  startDate   DateTime
+  endDate     DateTime // expected return
+  status      BookingStatus @default(PENDING)
+  qrToken     String        @unique // opaque, revocable
+  qrIssuedAt  DateTime      @default(now())
+  checkoutAt  DateTime?
+  checkinAt   DateTime?
+  dailyRate   Decimal       @db.Decimal(10, 2) // snapshot at booking time
+  totalAmount Decimal?      @db.Decimal(10, 2)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  equipment   Equipment    @relation(fields: [equipmentId], references: [id])
+  client      User         @relation("ClientBookings", fields: [clientId], references: [id])
+  site        Site?        @relation(fields: [siteId], references: [id])
+  operator    Operator?    @relation(fields: [operatorId], references: [id])
+  checkEvents CheckEvent[]
+  telemetry   Telemetry[]
+  dailyUsage  DailyUsage[]
+  anomalies   Anomaly[]
+
+  @@index([clientId, status])
+  @@index([equipmentId, startDate, endDate])
+  @@index([status, endDate]) // powers overdue + upcoming-return jobs
+}
+
+model CheckEvent {
+  id             String    @id @default(cuid())
+  bookingId      String
+  type           CheckType
+  at             DateTime  @default(now())
+  scannedById    String
+  lat            Float?
+  lng            Float?
+  meterHours     Float?
+  fuelPct        Float?
+  conditionNotes String?
+  photoUrl       String?
+
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  scannedBy User    @relation("ScannedBy", fields: [scannedById], references: [id])
+
+  @@index([bookingId])
+}
+
+/// Raw 10-minute tick. Append-only. Never queried directly by dashboards.
+model Telemetry {
+  id           BigInt      @id @default(autoincrement())
+  equipmentId  String
+  bookingId    String?
+  ts           DateTime
+  lat          Float
+  lng          Float
+  engineState  EngineState
+  engineHours  Float // cumulative meter reading
+  fuelPct      Float
+  engineTempC  Float
+  ambientTempC Float?
+  speedKph     Float       @default(0)
+  operatorId   String?
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  booking   Booking?  @relation(fields: [bookingId], references: [id])
+
+  @@unique([equipmentId, ts]) // idempotent ingest
+  @@index([equipmentId, ts(sort: Desc)])
+  @@index([bookingId, ts])
+}
+
+/// One row per equipment per day. The analytics table.
+model DailyUsage {
+  id             String   @id @default(cuid())
+  equipmentId    String
+  bookingId      String?
+  date           DateTime @db.Date
+  engineHours    Float    @default(0) // WORKING + IDLE
+  workingHours   Float    @default(0)
+  idleHours      Float    @default(0)
+  idleRatio      Float    @default(0)
+  isOperatingDay Boolean  @default(false) // engineHours >= 0.5
+  fuelUsedPct    Float    @default(0)
+  fuelPerHour    Float?
+  distanceKm     Float    @default(0)
+  maxTempC       Float?
+  avgTempC       Float?
+  nightMoveMin   Int      @default(0) // minutes moving 22:00–05:00
+  offSiteMin     Int      @default(0) // minutes outside site geofence
+  sampleCount    Int      @default(0)
+  hasOperator    Boolean  @default(false)
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  booking   Booking?  @relation(fields: [bookingId], references: [id])
+
+  @@unique([equipmentId, date])
+  @@index([date])
+}
+
+model Anomaly {
+  id          String        @id @default(cuid())
+  type        String // see steps.md §9 catalogue
+  severity    Severity
+  equipmentId String
+  bookingId   String?
+  detectedAt  DateTime      @default(now())
+  windowStart DateTime
+  windowEnd   DateTime
+  metric      String? // "idleRatio"
+  value       Float?
+  threshold   Float?
+  message     String
+  status      AnomalyStatus @default(OPEN)
+  dedupeKey   String        @unique // "HIGH_IDLE:eq_123:2026-08-30"
+  notifiedAt  DateTime?
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  booking   Booking?  @relation(fields: [bookingId], references: [id])
+
+  @@index([status, severity, detectedAt])
+  @@index([equipmentId, detectedAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // BOOKING_CONFIRMED | RETURN_REMINDER | OVERDUE | ANOMALY_DIGEST | ...
+  subject   String
+  body      String
+  channel   String    @default("EMAIL")
+  status    String    @default("PENDING") // PENDING | SENT | FAILED
+  dedupeKey String    @unique
+  sentAt    DateTime?
+  error     String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model DemandForecast {
+  id            String        @id @default(cuid())
+  equipmentType EquipmentType
+  periodStart   DateTime      @db.Date // Monday of forecast week
+  horizonWeek   Int // 1..8 weeks ahead
+  predicted     Float // rental-days demanded
+  lower         Float
+  upper         Float
+  fleetSize     Int
+  capacity      Float // fleetSize * 7
+  utilization   Float // predicted / capacity
+  gapUnits      Float // shortage(+) / surplus(-) in units
+  model         String // "holt-winters" | "seasonal-naive"
+  mase          Float? // backtest score
+  generatedAt   DateTime      @default(now())
+
+  @@unique([equipmentType, periodStart, generatedAt])
+  @@index([equipmentType, periodStart])
+}

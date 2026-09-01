@@ -1,0 +1,30 @@
+# Root-level safety net. Each workspace (backend/, frontend/) also has its own
+# .gitignore; these rules cover anything created at the repo root.
+
+# dependencies
+node_modules/
+
+# env files — never commit real secrets (.env.example is committed on purpose)
+.env
+.env.*
+!.env.example
+
+# build output
+dist/
+build/
+out/
+.next/
+
+# caches
+.cache/
+*.tsbuildinfo
+.eslintcache
+
+# logs
+logs/
+*.log
+
+# editor / OS
+.DS_Store
+.idea/
+*.pem
