@@ -6,7 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { DemandForecast, EquipmentType } from "@/lib/types";
 import { Plate } from "@/components/ui/plate";
 import { Button } from "@/components/ui/button";
-import { ForecastBand } from "@/components/charts";
+import { ForecastBand, ForecastRiskBar } from "@/components/charts";
 
 const selectClass =
   "rounded-plate border border-line bg-plate px-3 py-2 font-mono text-stamp-lg text-ink focus:border-ink";
@@ -79,6 +79,29 @@ export default function AdminForecast() {
     const week1 = (data ?? []).filter((r) => r.horizonWeek === 1 && r.gapUnits > 0);
     return week1.sort((a, b) => b.gapUnits - a.gapUnits).slice(0, 6);
   }, [data]);
+
+  // Every equipment type's next-week utilization at the CURRENT site
+  // selection — a different chart shape (categorical bar) from the band
+  // above, and it's the one place you can compare types against each other
+  // rather than one type across time.
+  const riskByType = useMemo(() => {
+    return (data ?? [])
+      .filter((r) => r.horizonWeek === 1 && (activeSiteId ? r.siteId === activeSiteId : r.siteId === null))
+      .map((r) => ({ equipmentType: r.equipmentType, utilizationPct: Math.round(r.utilization * 1000) / 10 }));
+  }, [data, activeSiteId]);
+
+  // The recommendation sentence is often byte-identical week over week (a
+  // flat model has nothing new to say) — collapsing consecutive duplicates
+  // is the difference between one clear line and a wall of repeated text.
+  const dedupedRecommendations = useMemo(() => {
+    const out: { sentence: string; weeks: string[] }[] = [];
+    for (const r of rows) {
+      const last = out[out.length - 1];
+      if (last && last.sentence === r.recommendation) last.weeks.push(r.periodStart);
+      else out.push({ sentence: r.recommendation, weeks: [r.periodStart] });
+    }
+    return out;
+  }, [rows]);
 
   const jumpTo = (row: DemandForecast) => {
     setSelectedSite(row.siteId ?? COMPANY);
@@ -167,7 +190,7 @@ export default function AdminForecast() {
                       <span className="stamp text-stamp-xs text-mute">{r.equipmentType.replace(/_/g, " ")}</span>
                     </span>
                     <span className="stamp shrink-0 rounded-plate border border-alert/40 bg-alert/12 px-2 py-0.5 text-stamp-xs text-alert">
-                      −{r.gapUnits}
+                      SHORT {r.gapUnits}
                     </span>
                   </button>
                 ))}
@@ -240,9 +263,14 @@ export default function AdminForecast() {
 
                 <Plate title="Recommendations" meta={`${rows.length} weeks`}>
                   <ul className="flex flex-col gap-3">
-                    {rows.map((r) => (
-                      <li key={r.id} className="border-b border-line/60 pb-3 text-note leading-snug text-steel last:border-0 last:pb-0">
-                        {r.recommendation}
+                    {dedupedRecommendations.map((d) => (
+                      <li key={d.weeks[0]} className="border-b border-line/60 pb-3 text-note leading-snug text-steel last:border-0 last:pb-0">
+                        {d.sentence}
+                        {d.weeks.length > 1 ? (
+                          <span className="stamp ml-1.5 text-stamp-xs text-mute">
+                            (same for weeks of {d.weeks[0]!.slice(5)}–{d.weeks[d.weeks.length - 1]!.slice(5)})
+                          </span>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -250,6 +278,10 @@ export default function AdminForecast() {
               </div>
             </div>
           )}
+
+          {riskByType.length > 1 ? (
+            <ForecastRiskBar data={riskByType} scope={`by type — ${siteLabel}`} />
+          ) : null}
         </div>
       )}
     </>

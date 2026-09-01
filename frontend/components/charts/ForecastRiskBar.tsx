@@ -17,11 +17,11 @@ export interface RiskBarPoint {
  * bar and the sentence on the forecast page never disagree about what counts
  * as a shortage.
  */
-export function ForecastRiskBar({ data }: { data: RiskBarPoint[] }) {
+export function ForecastRiskBar({ data, scope = "by equipment type" }: { data: RiskBarPoint[]; scope?: string }) {
   const sorted = [...data].sort((a, b) => b.utilizationPct - a.utilizationPct);
 
   return (
-    <ChartFrame title="Demand risk — next week" meta="by equipment type">
+    <ChartFrame title="Demand risk — next week" meta={scope}>
       {sorted.length === 0 ? (
         <ChartEmpty message="No forecast yet — run one from /admin/forecast" />
       ) : (
