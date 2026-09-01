@@ -122,6 +122,10 @@ model Session {
 model Account {
   id                    String    @id
   accountId             String
+  // better-auth 1.7 scopes account identity by issuer. The @better-auth/cli
+  // (latest 1.4.22) is behind the runtime and does NOT generate this field —
+  // without it, sign-up fails with `Unknown argument \`issuer\``.
+  issuer                String?
   providerId            String
   userId                String
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -136,6 +140,7 @@ model Account {
   updatedAt             DateTime  @updatedAt
 
   @@index([userId])
+  @@index([issuer, accountId])
   @@map("account")
 }
 
