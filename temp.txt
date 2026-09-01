@@ -17,8 +17,3 @@ Alerts : Upcoming returns , overdues and all will be sent to the the client as w
 forecasting : Based on the previous rented datas , we need to forecast what are all the equipments that may have the demand . 
 
 anamolies : idle hours , zero runtime , missing operator , unassigned sites and unusual movements should be tracked and those anamolies should also be emailed to both client and rental store . 
-
-
-
-
-

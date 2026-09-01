@@ -1,7 +1,7 @@
-import type { UsageLinePoint } from "@/types/asset";
+"use client";
+
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -9,46 +9,75 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CHART_HEIGHT, formatShortDate } from "@/lib/chart-utils";
+import type { UsageLinePoint } from "@/types/asset";
+import { CHART, SERIES, formatShortDate } from "@/lib/design-system";
+import {
+  ChartEmpty,
+  ChartFrame,
+  ChartLegend,
+  ChartTooltip,
+  LegendKey,
+  axisLine,
+  axisTick,
+  gridProps,
+} from "./shared";
 
 export interface UsageLineChartProps {
   data: UsageLinePoint[];
   title?: string;
 }
 
-export function UsageLineChart({ data, title = "Daily Usage + 7-day MA" }: UsageLineChartProps) {
+/**
+ * Emphasis, not two peer series: daily engine hours is the data, the 7-day
+ * average is context. So the average recedes into the de-emphasis grey and
+ * carries a dash pattern, rather than competing for a second bright hue.
+ */
+export function UsageLineChart({ data, title = "Engine hours per day" }: UsageLineChartProps) {
   const chartData = data.map((d) => ({ ...d, label: formatShortDate(d.date) }));
+  const latestAvg = data.at(-1)?.movingAvg7d;
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-3 text-sm font-semibold text-zinc-800">{title}</h3>
-      <div className="chart-container" style={{ height: CHART_HEIGHT }}>
+    <ChartFrame
+      title={title}
+      meta={latestAvg !== undefined ? `${latestAvg.toFixed(1)}h 7-day avg` : undefined}
+      footer={
+        <ChartLegend>
+          <LegendKey color={SERIES.primary} label="Engine hours" />
+          <LegendKey color={SERIES.mute} label="7-day average" dashed />
+        </ChartLegend>
+      }
+    >
+      {chartData.length === 0 ? (
+        <ChartEmpty />
+      ) : (
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} unit="h" />
-            <Tooltip
-              formatter={(value, name) => [
-                `${Number(value ?? 0)}h`,
-                name === "engineHours" ? "Engine hours" : "7-day avg",
-              ]}
-            />
-            <Legend
-              formatter={(v) => (v === "engineHours" ? "Engine hours" : "7-day moving avg")}
-            />
-            <Line type="monotone" dataKey="engineHours" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+          <LineChart data={chartData} margin={CHART.margin}>
+            <CartesianGrid {...gridProps} />
+            <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={axisLine} />
+            <YAxis tick={axisTick} tickLine={false} axisLine={false} width={CHART.axisWidth} unit="h" />
+            <Tooltip content={(p) => <ChartTooltip {...p} unit="h" />} />
+            {/* context first, so the series it supports draws on top of it */}
             <Line
               type="monotone"
               dataKey="movingAvg7d"
-              stroke="#8b5cf6"
-              strokeWidth={2}
+              name="7-day average"
+              stroke={SERIES.mute}
+              strokeWidth={CHART.strokeWidth}
               strokeDasharray="6 4"
               dot={false}
             />
+            <Line
+              type="monotone"
+              dataKey="engineHours"
+              name="Engine hours"
+              stroke={SERIES.primary}
+              strokeWidth={CHART.strokeWidth}
+              dot={{ r: CHART.dotRadius, fill: SERIES.primary, stroke: "#fff", strokeWidth: 2 }}
+              activeDot={{ r: 5 }}
+            />
           </LineChart>
         </ResponsiveContainer>
-      </div>
-    </div>
+      )}
+    </ChartFrame>
   );
 }

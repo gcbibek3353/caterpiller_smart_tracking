@@ -125,3 +125,58 @@ export interface FleetDashboardData {
     equipmentCode: string;
   }>;
 }
+
+/* ── Live API response shapes (C6's analytics endpoints) ─────────────────
+ * Hand-written to match `backend/src/routes/equipment-analytics.ts`. The
+ * backend is the source of truth — if a field moves, it moves there first.
+ */
+
+/** `GET /api/equipment/:id/timeseries` — one server-bucketed point. */
+export interface TimeseriesPoint {
+  ts: string;
+  value: number;
+  engineState?: EngineState;
+}
+
+/** `GET /api/equipment/:id/daily` — one DailyUsage row. */
+export interface DailyRow {
+  date: string;
+  engineHours: number;
+  workingHours: number;
+  idleHours: number;
+  idleRatio: number;
+  fuelUsedPct: number;
+  avgTempC: number | null;
+  distanceKm: number;
+}
+
+/** `GET /api/equipment/:id/track` — one GPS fix. */
+export interface TrackPoint {
+  lat: number;
+  lng: number;
+  ts: string;
+}
+
+/** `GET /api/equipment/:id/events` — a check-out or check-in scan. */
+export interface CheckEventRow {
+  id: string;
+  type: "CHECK_OUT" | "CHECK_IN";
+  at: string;
+  bookingCode: string;
+  scannedBy: string;
+  meterHours: number | null;
+  fuelPct: number | null;
+  conditionNotes: string | null;
+}
+
+/** `GET /api/analytics/fleet` — the admin dashboard aggregate. */
+export interface FleetAnalytics {
+  fleetUtilizationPct: number;
+  machinesOut: number;
+  totalMachines: number;
+  overdueCount: number;
+  availableCount: number;
+  maintenanceCount: number;
+  revenue: number;
+  statusDistribution: Array<{ status: string; count: number }>;
+}

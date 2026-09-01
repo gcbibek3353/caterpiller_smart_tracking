@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ForecastBand } from "@/components/charts";
 
 const selectClass =
-  "rounded-plate border border-line bg-plate px-3 py-2 font-mono text-[12px] text-ink focus:border-ink";
+  "rounded-plate border border-line bg-plate px-3 py-2 font-mono text-stamp-lg text-ink focus:border-ink";
 
 /** D9 — per-type forecast: shaded interval band, MASE badge, recommendation list, 85% crossover week. */
 export default function AdminForecast() {
@@ -52,8 +52,8 @@ export default function AdminForecast() {
     <>
       <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="stamp text-[10px] text-hivis">Demand intelligence</p>
-          <h1 className="font-display text-5xl font-bold uppercase leading-none tracking-tight">
+          <p className="stamp text-stamp-sm text-hivis">Demand intelligence</p>
+          <h1 className="font-display text-title-lg font-bold uppercase leading-none tracking-tight">
             Forecast
           </h1>
         </div>
@@ -79,16 +79,16 @@ export default function AdminForecast() {
       </header>
 
       {runError ? (
-        <p className="mb-4 border-l-2 border-alert bg-alert/6 px-4 py-3 text-sm text-alert">{runError}</p>
+        <p className="mb-4 border-l-2 border-alert bg-alert/6 px-4 py-3 text-body text-alert">{runError}</p>
       ) : null}
 
       {error ? (
-        <p className="border-l-2 border-alert bg-alert/6 px-4 py-3 text-sm text-alert">{error.message}</p>
+        <p className="border-l-2 border-alert bg-alert/6 px-4 py-3 text-body text-alert">{error.message}</p>
       ) : loading ? (
-        <p className="stamp text-[11px] text-mute">Reading the forecast…</p>
+        <p className="stamp text-stamp text-mute">Reading the forecast…</p>
       ) : !activeType || rows.length === 0 ? (
         <Plate title="Forecast" meta="no data yet">
-          <p className="text-sm text-steel">
+          <p className="text-body text-steel">
             Nothing generated yet. Hit &ldquo;Run forecast&rdquo; once there are bookings to learn from.
           </p>
         </Plate>
@@ -99,7 +99,7 @@ export default function AdminForecast() {
             meta={
               <span className="flex items-center gap-2">
                 <span
-                  className={`stamp rounded-plate border px-2 py-0.5 text-[9px] ${
+                  className={`stamp rounded-plate border px-2 py-0.5 text-stamp-xs ${
                     (first?.mase ?? 1) < 1 ? "border-ok/40 bg-ok/12 text-ok" : "border-warn/40 bg-warn/15 text-warn"
                   }`}
                 >
@@ -112,7 +112,7 @@ export default function AdminForecast() {
             <ForecastBand
               data={rows.map((r) => ({ weekStart: r.periodStart.slice(5, 10), predicted: r.predicted, lower: r.lower, upper: r.upper }))}
             />
-            <p className="stamp mt-3 text-[10px] text-mute">
+            <p className="stamp mt-3 text-stamp-sm text-mute">
               Shaded band = prediction interval, from the backtested residual spread — not decoration.
             </p>
           </Plate>
@@ -120,19 +120,19 @@ export default function AdminForecast() {
           <div className="flex flex-col gap-5">
             <Plate title="First week ≥ 85% utilization" tone="hivis">
               {crossover ? (
-                <p className="text-sm text-ink">
+                <p className="text-body text-ink">
                   Week of <span className="font-mono font-semibold">{crossover.periodStart}</span> —{" "}
                   <span className="font-mono font-semibold">{Math.round(crossover.utilization * 100)}%</span> projected.
                 </p>
               ) : (
-                <p className="text-sm text-steel">Stays under 85% for the full outlook — no shortage flagged.</p>
+                <p className="text-body text-steel">Stays under 85% for the full outlook — no shortage flagged.</p>
               )}
             </Plate>
 
             <Plate title="Recommendations" meta={`${rows.length} weeks`}>
               <ul className="flex flex-col gap-3">
                 {rows.map((r) => (
-                  <li key={r.id} className="border-b border-line/60 pb-3 text-[13px] leading-snug text-steel last:border-0 last:pb-0">
+                  <li key={r.id} className="border-b border-line/60 pb-3 text-note leading-snug text-steel last:border-0 last:pb-0">
                     {r.recommendation}
                   </li>
                 ))}

@@ -123,20 +123,20 @@ export default function SpikeScanPage() {
   return (
     <main className="mx-auto w-full max-w-5xl p-6 font-sans">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold">QR scan spike</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <h1 className="text-title-sm font-semibold">QR scan spike</h1>
+        <p className="mt-1 text-body text-mute">
           Throwaway page (plan-24h B2). Proves the camera opens and decodes on a real phone.
           Prints the raw decoded string — expected shape is{' '}
-          <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs">RENT:v1:&lt;token&gt;</code>.
+          <code className="rounded-plate bg-dust px-1 py-0.5 font-mono text-data-xs">RENT:v1:&lt;token&gt;</code>.
         </p>
       </header>
 
       {env && (
         <div
-          className={`mb-6 rounded-lg border p-3 text-sm ${
+          className={`mb-6 rounded-plate border p-3 text-body ${
             env.secure && env.hasMediaDevices
-              ? 'border-green-200 bg-green-50 text-green-900'
-              : 'border-amber-300 bg-amber-50 text-amber-900'
+              ? 'border-ok/35 bg-ok/8 text-ok'
+              : 'border-warn/40 bg-warn/10 text-warn'
           }`}
         >
           <div className="font-medium">
@@ -144,12 +144,12 @@ export default function SpikeScanPage() {
               ? 'Secure context — camera is available'
               : 'Not a secure context — the camera will be blocked'}
           </div>
-          <div className="mt-1 font-mono text-xs">
+          <div className="mt-1 font-mono text-data-xs">
             origin={env.origin} · isSecureContext={String(env.secure)} · mediaDevices=
             {String(env.hasMediaDevices)}
           </div>
           {!env.secure && (
-            <div className="mt-1 text-xs">
+            <div className="mt-1 text-note">
               Restart the dev server with <code>--experimental-https</code> and open the https:// URL.
             </div>
           )}
@@ -159,13 +159,13 @@ export default function SpikeScanPage() {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Camera */}
         <section className="flex flex-col">
-          <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
+          <h2 className="mb-2 text-body font-medium uppercase tracking-wide text-mute">
             Camera
           </h2>
-          <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-neutral-900">
+          <div className="relative aspect-square w-full overflow-hidden rounded-plate bg-ink">
             <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
             {!running && (
-              <div className="absolute inset-0 grid place-items-center text-sm text-neutral-400">
+              <div className="absolute inset-0 grid place-items-center text-body text-mute">
                 Camera stopped
               </div>
             )}
@@ -176,14 +176,14 @@ export default function SpikeScanPage() {
               type="button"
               onClick={running ? stopCamera : startCamera}
               disabled={starting}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-plate bg-ink px-4 py-2 text-body font-medium text-plate disabled:opacity-50"
             >
               {starting ? 'Starting…' : running ? 'Stop camera' : 'Start camera'}
             </button>
             {running && cameras.length > 1 && (
               <select
                 onChange={(e) => scannerRef.current?.setCamera(e.target.value)}
-                className="rounded-md border border-neutral-300 px-2 py-2 text-sm"
+                className="rounded-plate border border-line px-2 py-2 text-body"
                 aria-label="Select camera"
               >
                 {cameras.map((cam) => (
@@ -196,7 +196,7 @@ export default function SpikeScanPage() {
           </div>
 
           {error && (
-            <p className="mt-3 rounded-md border border-red-200 bg-red-50 p-2 font-mono text-xs text-red-700">
+            <p className="mt-3 rounded-plate border border-alert/35 bg-alert/8 p-2 font-mono text-data-xs text-alert">
               {error}
             </p>
           )}
@@ -204,7 +204,7 @@ export default function SpikeScanPage() {
 
         {/* Manual entry — cameras fail on stage (steps.md §5, plan-24h B9). */}
         <section className="flex flex-col">
-          <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
+          <h2 className="mb-2 text-body font-medium uppercase tracking-wide text-mute">
             Manual entry
           </h2>
           <form onSubmit={submitManual} className="flex gap-2">
@@ -216,41 +216,41 @@ export default function SpikeScanPage() {
               autoComplete="off"
               autoCapitalize="none"
               spellCheck={false}
-              className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm"
+              className="min-w-0 flex-1 rounded-plate border border-line px-3 py-2 font-mono text-data"
             />
             <button
               type="submit"
-              className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-medium"
+              className="rounded-plate border border-ink px-4 py-2 text-body font-medium"
             >
               Submit
             </button>
           </form>
-          <p className="mt-2 text-xs text-neutral-500">
+          <p className="mt-2 text-note text-mute">
             Type or paste a code when the camera will not cooperate. Same output path as a scan.
           </p>
 
-          <h2 className="mt-6 mb-2 text-sm font-medium uppercase tracking-wide text-neutral-500">
+          <h2 className="mt-6 mb-2 text-body font-medium uppercase tracking-wide text-mute">
             Decoded ({scans.length})
           </h2>
           {scans.length === 0 ? (
-            <p className="text-sm text-neutral-400">Nothing scanned yet.</p>
+            <p className="text-body text-mute">Nothing scanned yet.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {scans.map((scan) => (
-                <li key={scan.id} className="rounded-md border border-neutral-200 p-2">
-                  <div className="flex items-center gap-2 text-xs text-neutral-500">
+                <li key={scan.id} className="rounded-plate border border-line p-2">
+                  <div className="flex items-center gap-2 text-note text-mute">
                     <span
-                      className={`rounded px-1.5 py-0.5 font-medium ${
+                      className={`rounded-plate px-1.5 py-0.5 font-medium ${
                         scan.source === 'camera'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-neutral-200 text-neutral-700'
+                          ? 'bg-busy/12 text-busy'
+                          : 'bg-dust text-steel'
                       }`}
                     >
                       {scan.source}
                     </span>
                     <span>{scan.at}</span>
                   </div>
-                  <p className="mt-1 break-all font-mono text-sm">{scan.value}</p>
+                  <p className="mt-1 break-all font-mono text-data">{scan.value}</p>
                 </li>
               ))}
             </ul>

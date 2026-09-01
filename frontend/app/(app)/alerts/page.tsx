@@ -38,17 +38,17 @@ export default function AlertsPage() {
   return (
     <>
       <header className="mb-7">
-        <p className="stamp text-[10px] text-hivis">Live feed</p>
-        <h1 className="font-display text-5xl font-bold uppercase leading-none tracking-tight">Alerts</h1>
+        <p className="stamp text-stamp-sm text-hivis">Live feed</p>
+        <h1 className="font-display text-title-lg font-bold uppercase leading-none tracking-tight">Alerts</h1>
       </header>
 
       {error ? (
-        <p className="border-l-2 border-alert bg-alert/6 px-4 py-3 text-sm text-alert">{error.message}</p>
+        <p className="border-l-2 border-alert bg-alert/6 px-4 py-3 text-body text-alert">{error.message}</p>
       ) : loading ? (
-        <p className="stamp text-[11px] text-mute">Reading the feed…</p>
+        <p className="stamp text-stamp text-mute">Reading the feed…</p>
       ) : feed.length === 0 ? (
         <Plate title="Alerts" meta="0">
-          <p className="text-sm text-steel">Nothing yet — anomalies and notifications will land here as they fire.</p>
+          <p className="text-body text-steel">Nothing yet — anomalies and notifications will land here as they fire.</p>
         </Plate>
       ) : (
         <ol className="flex flex-col gap-3">
@@ -58,8 +58,8 @@ export default function AlertsPage() {
                 <div className="flex items-start gap-4 rounded-plate border border-line bg-plate px-4 py-3">
                   <StatusPill status={item.row.severity} kind="severity" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-ink">{item.row.message}</p>
-                    <p className="stamp mt-1 text-[9px] text-mute">
+                    <p className="text-body text-ink">{item.row.message}</p>
+                    <p className="stamp mt-1 text-stamp-xs text-mute">
                       {item.row.type.replace(/_/g, " ")} · {new Date(item.ts).toLocaleString()} ·{" "}
                       {item.row.status.replace(/_/g, " ")}
                     </p>
@@ -67,15 +67,15 @@ export default function AlertsPage() {
                 </div>
               ) : (
                 <div className="flex items-start gap-4 rounded-plate border border-line bg-plate px-4 py-3">
-                  <span className={`stamp inline-flex items-center rounded-plate border px-2 py-1 text-[10px] leading-none ${NOTIFICATION_TONE[item.row.status]}`}>
+                  <span className={`stamp inline-flex items-center rounded-plate border px-2 py-1 text-stamp-sm leading-none ${NOTIFICATION_TONE[item.row.status]}`}>
                     {item.row.status}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-ink">{item.row.subject}</p>
-                    <p className="stamp mt-1 text-[9px] text-mute">
+                    <p className="text-body text-ink">{item.row.subject}</p>
+                    <p className="stamp mt-1 text-stamp-xs text-mute">
                       {item.row.type.replace(/_/g, " ")} · {item.row.channel} · {new Date(item.ts).toLocaleString()}
                     </p>
-                    {item.row.error ? <p className="mt-1 text-[12px] text-alert">{item.row.error}</p> : null}
+                    {item.row.error ? <p className="mt-1 text-stamp-lg text-alert">{item.row.error}</p> : null}
                   </div>
                 </div>
               )}

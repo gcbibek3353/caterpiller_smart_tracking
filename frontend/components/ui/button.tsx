@@ -24,7 +24,7 @@ export function Button({
     <button
       {...props}
       disabled={disabled || loading}
-      className={`stamp rounded-plate border px-4 py-2.5 text-[12px] transition-colors
+      className={`stamp rounded-plate border px-4 py-2.5 text-stamp-lg transition-colors
         disabled:cursor-not-allowed disabled:opacity-45 ${VARIANTS[variant]} ${className}`}
     >
       {loading ? "Working…" : children}

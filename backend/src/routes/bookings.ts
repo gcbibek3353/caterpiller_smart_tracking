@@ -5,6 +5,7 @@ import { prisma } from "../db";
 import { badRequest, conflict, notFound, ok } from "../lib/http";
 import { paginated, serializeBooking } from "../lib/serialize";
 import { assertCanSeeBooking, requireAuth, requireRole } from "../middleware/auth";
+import { isBookingOverdue, overdueCutoff } from "../lib/overdue";
 import { valid, validate } from "../middleware/validate";
 import {
   BookingListQuery,
@@ -227,10 +228,12 @@ bookingRoutes.get("/", validate("query", BookingListQuery), async (c) => {
   if (q.from) where.endDate = { gte: q.from };
   if (q.to) where.startDate = { lte: q.to };
 
-  // Still out with the return date behind us. Matches the [status, endDate] index.
+  // Still out with the whole return day behind us. Matches the
+  // [status, endDate] index. The grace day is `lib/overdue.ts`'s call, not a
+  // local one — see the note there.
   if (q.overdue) {
     where.status = "CHECKED_OUT";
-    where.endDate = { ...(where.endDate as object), lt: new Date() };
+    where.endDate = { ...(where.endDate as object), lt: overdueCutoff() };
   }
 
   const [rows, total] = await Promise.all([
@@ -249,8 +252,13 @@ bookingRoutes.get("/", validate("query", BookingListQuery), async (c) => {
     prisma.booking.count({ where }),
   ]);
 
-  // qrToken never travels in a list response.
-  const items = rows.map(({ qrToken: _qrToken, ...b }) => serializeBooking(b));
+  // qrToken never travels in a list response. `isOverdue` does, so the admin
+  // table can badge a late rental without re-deriving the grace-day rule in the
+  // browser — one definition, in lib/overdue.ts, same as the detail endpoint.
+  const items = rows.map(({ qrToken: _qrToken, ...b }) => ({
+    ...serializeBooking(b),
+    isOverdue: isBookingOverdue(b.status, b.endDate),
+  }));
   return ok(c, paginated(items, total, q.page, q.limit));
 });
 
@@ -282,7 +290,7 @@ bookingRoutes.get("/:id", validate("param", IdParam), async (c) => {
   const { qrToken: _qrToken, ...safe } = booking;
   return ok(c, {
     ...serializeBooking(safe),
-    isOverdue: booking.status === "CHECKED_OUT" && booking.endDate < new Date(),
+    isOverdue: isBookingOverdue(booking.status, booking.endDate),
   });
 });
 
@@ -337,15 +345,36 @@ bookingRoutes.patch(
 
     const data: Prisma.BookingUpdateInput = {};
     if (body.status) data.status = body.status;
+
+    /**
+     * Existence is not enough: a site or operator belongs to ONE client, and
+     * dispatching machine X to another company's site (or naming their driver)
+     * is a data leak dressed up as a typo. The id has to belong to the client
+     * on this booking.
+     */
     if (body.siteId !== undefined) {
-      if (body.siteId && !(await prisma.site.findUnique({ where: { id: body.siteId } }))) {
-        throw notFound("Site");
+      if (body.siteId) {
+        const site = await prisma.site.findUnique({
+          where: { id: body.siteId },
+          select: { clientId: true },
+        });
+        if (!site) throw notFound("Site");
+        if (site.clientId !== existing.clientId) {
+          throw badRequest("That site belongs to a different client than this booking");
+        }
       }
       data.site = body.siteId ? { connect: { id: body.siteId } } : { disconnect: true };
     }
     if (body.operatorId !== undefined) {
-      if (body.operatorId && !(await prisma.operator.findUnique({ where: { id: body.operatorId } }))) {
-        throw notFound("Operator");
+      if (body.operatorId) {
+        const operator = await prisma.operator.findUnique({
+          where: { id: body.operatorId },
+          select: { clientId: true },
+        });
+        if (!operator) throw notFound("Operator");
+        if (operator.clientId !== existing.clientId) {
+          throw badRequest("That operator belongs to a different client than this booking");
+        }
       }
       data.operator = body.operatorId ? { connect: { id: body.operatorId } } : { disconnect: true };
     }

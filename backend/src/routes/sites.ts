@@ -5,7 +5,7 @@ import { forbidden, notFound, ok } from "../lib/http";
 import { paginated } from "../lib/serialize";
 import { requireAuth } from "../middleware/auth";
 import { validate, valid } from "../middleware/validate";
-import { CreateSiteInput, IdParam, Pagination, UpdateSiteInput } from "../contracts";
+import { CreateSiteInput, IdParam, SiteListQuery, UpdateSiteInput } from "../contracts";
 import type { AppEnv, SessionUser } from "../types";
 
 export const siteRoutes = new Hono<AppEnv>();
@@ -24,11 +24,17 @@ const assertOwns = (user: SessionUser, clientId: string) => {
   }
 };
 
-siteRoutes.get("/", validate("query", Pagination), async (c) => {
-  const { page, limit } = valid(c, "query", Pagination);
+siteRoutes.get("/", validate("query", SiteListQuery), async (c) => {
+  const { page, limit, clientId } = valid(c, "query", SiteListQuery);
   const user = c.get("user");
 
-  const where: Prisma.SiteWhereInput = user.role === "ADMIN" ? {} : { clientId: user.id };
+  /**
+   * A CLIENT is pinned to their own rows and `?clientId=` is ignored rather
+   * than honoured — otherwise the filter is an enumeration hole, same reasoning
+   * as GET /api/bookings.
+   */
+  const where: Prisma.SiteWhereInput =
+    user.role === "ADMIN" ? (clientId ? { clientId } : {}) : { clientId: user.id };
 
   const [items, total] = await Promise.all([
     prisma.site.findMany({

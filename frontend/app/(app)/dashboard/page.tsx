@@ -18,8 +18,8 @@ export default function ClientDashboard() {
   return (
     <>
       <header className="mb-7">
-        <p className="stamp text-[10px] text-hivis">{user?.companyName ?? "Client"}</p>
-        <h1 className="font-display text-5xl font-bold uppercase leading-none tracking-tight">
+        <p className="stamp text-stamp-sm text-hivis">{user?.companyName ?? "Client"}</p>
+        <h1 className="font-display text-title-lg font-bold uppercase leading-none tracking-tight">
           {user?.name ?? "Dashboard"}
         </h1>
       </header>
@@ -27,18 +27,18 @@ export default function ClientDashboard() {
       <div className="grid gap-5 sm:grid-cols-2">
         <Plate title="Available to book" meta={fleet.data ? `${fleet.data.total} machines` : undefined}>
           {fleet.loading ? (
-            <p className="stamp text-[11px] text-mute">Loading…</p>
+            <p className="stamp text-stamp text-mute">Loading…</p>
           ) : (
             !fleet.data?.items.length ? (
-              <p className="text-sm text-steel">
+              <p className="text-body text-steel">
                 Every machine is out right now. Check back, or widen your dates when booking.
               </p>
             ) : (
             fleet.data?.items.map((e) => (
               <div key={e.id} className="flex items-center justify-between gap-3 border-b border-line/60 py-2 last:border-0">
                 <div className="min-w-0">
-                  <p className="font-mono text-sm">{e.code}</p>
-                  <p className="truncate text-[13px] text-mute">{e.type.replace(/_/g, " ")}</p>
+                  <p className="font-mono text-data">{e.code}</p>
+                  <p className="truncate text-note text-mute">{e.type.replace(/_/g, " ")}</p>
                 </div>
                 <StatusPill status={e.status} />
               </div>
@@ -48,7 +48,7 @@ export default function ClientDashboard() {
 
         <Plate title="Your sites" meta={sites.data ? `${sites.data.total}` : undefined}>
           {sites.loading ? (
-            <p className="stamp text-[11px] text-mute">Loading…</p>
+            <p className="stamp text-stamp text-mute">Loading…</p>
           ) : sites.data?.items.length ? (
             <PlateRows>
               {sites.data.items.map((s) => (
@@ -56,14 +56,14 @@ export default function ClientDashboard() {
               ))}
             </PlateRows>
           ) : (
-            <p className="text-sm text-steel">
+            <p className="text-body text-steel">
               No sites yet. Add one when you make your first booking.
             </p>
           )}
         </Plate>
       </div>
 
-      <p className="stamp mt-8 text-[10px] text-mute">
+      <p className="stamp mt-8 text-stamp-sm text-mute">
         Placeholder — B7 replaces this with active rentals, next returns and spend.
       </p>
     </>

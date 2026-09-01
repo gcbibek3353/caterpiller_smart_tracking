@@ -160,3 +160,77 @@ export type Notification = {
   error: string | null;
   createdAt: string;
 };
+
+export type CheckType = "CHECK_OUT" | "CHECK_IN";
+
+/**
+ * The relations the booking endpoints join in.
+ *
+ * The three shapes differ — the list joins less than the detail, which joins
+ * less than the scan preview — so the fields only some of them carry are
+ * optional here rather than modelled as three near-identical types.
+ */
+export type BookingEquipment = Pick<Equipment, "id" | "code" | "name" | "type"> &
+  Partial<Pick<Equipment, "imageUrl" | "make" | "model" | "year" | "status">>;
+
+export type BookingClient = { id: string; name: string; companyName: string | null } & Partial<{
+  email: string;
+  phone: string | null;
+}>;
+
+export type BookingSite = { id: string; name: string } & Partial<
+  Pick<Site, "lat" | "lng" | "radiusMeters">
+>;
+
+export type BookingOperator = { id: string; name: string } & Partial<{ phone: string | null }>;
+
+export type BookingWithRelations = Booking & {
+  equipment: BookingEquipment;
+  client: BookingClient;
+  site: BookingSite | null;
+  operator: BookingOperator | null;
+  /** Detail and scan-preview only. Grace day applied server-side — see backend/src/lib/overdue.ts. */
+  isOverdue?: boolean;
+};
+
+/** POST /api/bookings/:id/confirm — the QR comes back inline, no second trip. */
+export type ConfirmedBooking = BookingWithRelations & {
+  qrDataUrl: string;
+  emailed: boolean;
+  emailError?: string;
+};
+
+export type CheckEvent = {
+  id: string;
+  bookingId: string;
+  type: CheckType;
+  at: string;
+  scannedById: string | null;
+  lat: number | null;
+  lng: number | null;
+  meterHours: number | null;
+  fuelPct: number | null;
+  conditionNotes: string | null;
+  photoUrl: string | null;
+};
+
+/** POST /api/scan/resolve — preview only, nothing is written. */
+export type ScanPreview = {
+  action: CheckType;
+  booking: BookingWithRelations;
+  /** Prefill for the check-in form: what the meter and tank read on the way out. */
+  lastCheckout: { at: string; meterHours: number | null; fuelPct: number | null } | null;
+  isOverdue: boolean;
+};
+
+/** POST /api/scan/commit — the action happened. */
+export type ScanReceipt = {
+  action: CheckType;
+  booking: BookingWithRelations;
+  checkEvent: CheckEvent;
+  /** CHECK_IN only. */
+  billableDays?: number;
+  totalEngineHours?: number;
+  emailed: boolean;
+  emailError?: string;
+};

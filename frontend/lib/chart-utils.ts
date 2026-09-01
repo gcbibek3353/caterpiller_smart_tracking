@@ -1,21 +1,17 @@
 import type { UsageLinePoint } from "@/types/asset";
+import { CHART, ENGINE_STATE_COLOR } from "./design-system";
 
-export const CHART_HEIGHT = 280;
+/**
+ * Chart helpers that aren't design tokens. Colours, geometry and formatters
+ * live in `lib/design-system.ts` — these re-exports keep the older import
+ * sites working without giving the palette a second home.
+ */
+export { formatShortDate, formatTime, formatDateTime } from "./design-system";
 
-export const ENGINE_STATE_COLORS = {
-  OFF: "#94a3b8",
-  IDLE: "#f59e0b",
-  WORKING: "#22c55e",
-} as const;
+export const CHART_HEIGHT = CHART.height;
+export const ENGINE_STATE_COLORS = ENGINE_STATE_COLOR;
 
-export function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", { month: "short", day: "numeric" });
-}
-
-export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-}
-
+/** Trailing moving average. Short windows at the head average what's there. */
 export function computeMovingAverage(
   data: Array<{ date: string; engineHours: number }>,
   window = 7,

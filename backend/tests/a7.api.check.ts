@@ -105,6 +105,7 @@ await admin("/api/auth/sign-in/email", { method: "POST", body: JSON.stringify({ 
 await client("/api/auth/sign-up/email", { method: "POST", body: JSON.stringify({ email: "c1@b.com", password: "client123", name: "Client One" }) });
 await other("/api/auth/sign-up/email", { method: "POST", body: JSON.stringify({ email: "c2@b.com", password: "client123", name: "Client Two" }) });
 const c1 = await prisma.user.findUniqueOrThrow({ where: { email: "c1@b.com" } });
+const c2 = await prisma.user.findUniqueOrThrow({ where: { email: "c2@b.com" } });
 
 console.log("\n── RBAC ──");
 const mk = (code: string) => ({ code, name: code, type: "EXCAVATOR", dailyRate: 450, homeLat: 27.7, homeLng: 85.3 });
@@ -174,6 +175,28 @@ r = await admin(`/api/sites/${siteId}`);
 check("ADMIN can read any site", r.status === 200, `${r.status}`);
 r = await other(`/api/sites/${siteId}`, { method: "PATCH", body: JSON.stringify({ name: "hijack" }) });
 check("other client cannot PATCH it (403)", r.status === 403, `${r.status}`);
+
+/**
+ * `?clientId=` — the affordance the admin bookings UI needs so its
+ * assign-site control offers only the sites belonging to the booking's own
+ * client. Like every other client-scoped filter it is an ADMIN one: a CLIENT
+ * sending it stays pinned to their own rows rather than having it honoured,
+ * or the filter becomes an enumeration hole.
+ */
+r = await other("/api/sites", { method: "POST", body: JSON.stringify({ name: "Site B", lat: 27.8, lng: 85.4 }) });
+const otherSiteId = r.body?.data?.id;
+r = await admin(`/api/sites?clientId=${c1.id}`);
+check("ADMIN can filter sites by clientId", (r.body?.data?.items ?? []).every((s:any)=>s.clientId===c1.id) && (r.body?.data?.items ?? []).some((s:any)=>s.id===siteId), JSON.stringify(r.body?.data?.items?.map((s:any)=>s.clientId)));
+check("  and the other client's site is excluded", !(r.body?.data?.items ?? []).some((s:any)=>s.id===otherSiteId));
+r = await other(`/api/sites?clientId=${c1.id}`);
+check("CLIENT's ?clientId= is IGNORED, not honoured", !(r.body?.data?.items ?? []).some((s:any)=>s.id===siteId), JSON.stringify(r.body?.data?.items?.map((s:any)=>s.id)));
+
+r = await client("/api/operators", { method: "POST", body: JSON.stringify({ name: "Ram Operator" }) });
+const opId = r.body?.data?.id;
+r = await admin(`/api/operators?clientId=${c1.id}`);
+check("ADMIN can filter operators by clientId", (r.body?.data?.items ?? []).every((o:any)=>o.clientId===c1.id) && (r.body?.data?.items ?? []).some((o:any)=>o.id===opId), JSON.stringify(r.body?.data?.items?.map((o:any)=>o.clientId)));
+r = await admin(`/api/operators?clientId=${c2.id}`);
+check("  filtering to a client with none is empty, not everything", !(r.body?.data?.items ?? []).some((o:any)=>o.id===opId));
 
 console.log("\n── validation still enforced ──");
 r = await admin("/api/equipment", { method: "POST", body: JSON.stringify({ code: "bad code!", name: "x", type: "EXCAVATOR", dailyRate: 1, homeLat: 0, homeLng: 0 }) });

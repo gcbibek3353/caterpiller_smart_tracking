@@ -27,7 +27,7 @@ const SEVERITY: Record<Severity, string> = {
 };
 
 const BASE =
-  "stamp inline-flex items-center rounded-plate border px-2 py-1 text-[10px] leading-none";
+  "stamp inline-flex items-center rounded-plate border px-2 py-1 text-stamp-sm leading-none";
 
 export const StatusPill = ({
   status,

@@ -1,50 +1,56 @@
 import type { EquipmentSummary } from "@/types/asset";
 import { StatusPill } from "@/components/ui/status";
+import { formatDateTime } from "@/lib/design-system";
 
-const ENGINE_STATE_TONE: Record<string, string> = {
-  OFF: "border-mute/30 bg-mute/12 text-mute",
-  IDLE: "border-warn/40 bg-warn/15 text-warn",
-  WORKING: "border-ok/35 bg-ok/12 text-ok",
-};
-
+/**
+ * Section 1 of the asset page: the identification plate itself. Code and name
+ * on the left in display type, the machine's current assignment stamped on the
+ * right — exactly the label riveted to the real machine.
+ */
 export function AssetHeader({ summary }: { summary: EquipmentSummary }) {
   return (
-    <div className="rounded-plate border border-line bg-plate p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="font-display text-3xl font-bold uppercase leading-none tracking-tight text-ink">
-              {summary.code}
-            </h1>
-            <StatusPill status={summary.status} kind="equipment" />
-            <span className={`stamp inline-flex items-center rounded-plate border px-2 py-1 text-[10px] leading-none ${ENGINE_STATE_TONE[summary.currentEngineState]}`}>
-              Engine: {summary.currentEngineState}
+    <section className="rounded-plate border border-line bg-plate shadow-plate">
+      <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="stamp text-stamp-xs text-hivis">{summary.type.replace(/_/g, " ")}</p>
+          <h1 className="font-display text-title-lg font-bold uppercase text-ink">
+            {summary.code}
+          </h1>
+          <p className="mt-1 text-body text-steel">{summary.name}</p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <StatusPill status={summary.status} />
+            <span className="stamp rounded-plate border border-line bg-dust px-2 py-1 text-stamp-sm text-steel">
+              Engine {summary.currentEngineState}
             </span>
           </div>
-          <p className="mt-1.5 text-lg text-ink">{summary.name}</p>
-          <p className="stamp text-[10px] text-mute">{summary.type.replace(/_/g, " ")}</p>
         </div>
-        <div className="space-y-1 text-[13px] text-steel sm:text-right">
-          {summary.site && (
-            <p>
-              <span className="stamp text-[9px] text-mute">Site </span>
-              <span className="font-mono">{summary.site.name}</span>
-            </p>
-          )}
-          {summary.operator && (
-            <p>
-              <span className="stamp text-[9px] text-mute">Operator </span>
-              <span className="font-mono">{summary.operator.name}</span>
-            </p>
-          )}
-          {summary.booking && (
-            <p>
-              <span className="stamp text-[9px] text-mute">Booking </span>
-              <span className="font-mono">{summary.booking.code}</span>
-            </p>
-          )}
-        </div>
+
+        <dl className="shrink-0 sm:min-w-56">
+          <Row label="Site" value={summary.site?.name} />
+          <Row label="Operator" value={summary.operator?.name} />
+          <Row label="Booking" value={summary.booking?.code} mono />
+          <Row
+            label="Return by"
+            value={summary.booking ? formatDateTime(summary.booking.endDate) : undefined}
+          />
+        </dl>
       </div>
+    </section>
+  );
+}
+
+function Row({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-line/60 py-1.5 last:border-0">
+      <dt className="stamp shrink-0 text-stamp-xs text-mute">{label}</dt>
+      <dd
+        className={`truncate text-right text-data-sm ${
+          value ? "text-ink" : "text-mute"
+        } ${mono ? "font-mono" : ""}`}
+      >
+        {value ?? "—"}
+      </dd>
     </div>
   );
 }

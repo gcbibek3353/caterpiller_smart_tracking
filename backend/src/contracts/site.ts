@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Pagination } from "./common";
 
 export const CreateSiteInput = z.object({
   name: z.string().min(1).max(120),
@@ -28,3 +29,18 @@ export const UpdateOperatorInput = CreateOperatorInput.omit({ clientId: true })
   .partial()
   .refine((v) => Object.keys(v).length > 0, { message: "Provide at least one field" });
 export type UpdateOperatorInput = z.infer<typeof UpdateOperatorInput>;
+
+/**
+ * ADMIN may narrow either list to a single client.
+ *
+ * B8's "assign site / assign operator" controls must offer only the rows
+ * belonging to the booking's own client — without this the admin picks from
+ * every client's sites at once, and PATCH /api/bookings/:id would happily
+ * accept the cross-client one. Ignored for a CLIENT, who is already pinned to
+ * their own rows server-side.
+ */
+export const SiteListQuery = Pagination.extend({ clientId: z.string().min(1).optional() });
+export type SiteListQuery = z.infer<typeof SiteListQuery>;
+
+export const OperatorListQuery = Pagination.extend({ clientId: z.string().min(1).optional() });
+export type OperatorListQuery = z.infer<typeof OperatorListQuery>;
