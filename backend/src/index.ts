@@ -17,6 +17,7 @@ import { notificationRoutes } from "./routes/notifications";
 import { telemetry, jobs } from "./routes/telemetry";
 import { equipmentAnalytics, fleetAnalytics } from "./routes/equipment-analytics";
 import { bookingRoutes } from "./routes/bookings";
+import { scanRoutes } from "./routes/scan";
 import { startScheduler } from "./jobs/scheduler";
 import { requireRole } from "./middleware/auth";
 import type { AppEnv } from "./types";
@@ -68,7 +69,7 @@ app.route("/api/equipment", equipmentAnalytics); // C6 ✅
 app.route("/api/sites", siteRoutes); // A7 ✅
 app.route("/api/operators", operatorRoutes); // A7 ✅
 app.route("/api/bookings", bookingRoutes); // B4 ✅
-// app.route("/api/scan",      scanRoutes);       // B6
+app.route("/api/scan", scanRoutes); // B6 ✅
 app.route("/api/telemetry", telemetry); // C4 ✅ — machine-to-machine, guards itself via x-api-key
 app.use("/api/jobs/*", requireAuth, requireRole("ADMIN")); // rollup trigger had no guard at all
 app.route("/api/jobs", jobs); // C4 ✅

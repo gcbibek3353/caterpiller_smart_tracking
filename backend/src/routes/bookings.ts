@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { badRequest, conflict, notFound, ok } from "../lib/http";
 import { paginated, serializeBooking } from "../lib/serialize";
-import { assertCanSeeBooking, requireAuth } from "../middleware/auth";
+import { assertCanSeeBooking, requireAuth, requireRole } from "../middleware/auth";
 import { valid, validate } from "../middleware/validate";
 import {
   BookingListQuery,
@@ -12,6 +12,11 @@ import {
   IdParam,
   UpdateBookingInput,
 } from "../contracts";
+import { qrDataUrl, qrPng } from "../lib/qr";
+import { mailer } from "../lib/mail";
+import { sendMail } from "../services/mailer/service";
+import { renderBookingConfirmed } from "../services/mailer/templates/bookingConfirmed";
+import { num } from "../lib/serialize";
 import type { AppEnv, SessionUser } from "../types";
 
 export const bookingRoutes = new Hono<AppEnv>();
@@ -372,3 +377,128 @@ bookingRoutes.patch(
     return ok(c, serializeBooking(safe));
   },
 );
+
+// ── POST /api/bookings/:id/confirm ────────────────────────────────────
+/**
+ * PENDING → CONFIRMED, the only transition an admin drives by hand. Every
+ * other one goes through the scan endpoints, so the state machine stays in
+ * one place (steps.md §5).
+ */
+bookingRoutes.post(
+  "/:id/confirm",
+  requireRole("ADMIN"),
+  validate("param", IdParam),
+  async (c) => {
+    const { id } = valid(c, "param", IdParam);
+
+    /**
+     * Re-read status inside the transaction for the same reason the scan
+     * commit does: two admins double-tapping Confirm must not both issue a
+     * token, or the second silently revokes the QR the first just emailed.
+     */
+    const booking = await prisma.$transaction(async (tx) => {
+      const current = await tx.booking.findUnique({
+        where: { id },
+        select: { status: true },
+      });
+      if (!current) throw notFound("Booking");
+      if (current.status !== "PENDING") {
+        throw conflict(
+          current.status === "CONFIRMED"
+            ? "This booking is already confirmed"
+            : `A ${current.status} booking cannot be confirmed`,
+        );
+      }
+
+      return tx.booking.update({
+        where: { id },
+        data: {
+          status: "CONFIRMED",
+          // Rotated here so the token's usable life starts at confirmation,
+          // which is what steps.md §5 intends by "generate on confirm". B4 has
+          // to write one at creation because the column is NOT NULL + @unique,
+          // but that one is never exposed, so replacing it costs nothing.
+          qrToken: newQrToken(),
+          qrIssuedAt: new Date(),
+        },
+        include: bookingInclude,
+      });
+    });
+
+    /**
+     * Sent after the transaction commits, never inside it: a slow SMTP call
+     * would hold the row lock open for its whole duration. A mail failure also
+     * must not roll back a confirmation the admin already saw succeed —
+     * sendMail records its own FAILED Notification row, which /alerts shows.
+     */
+    let emailed = false;
+    let emailError: string | undefined;
+    try {
+      const png = await qrPng(booking.qrToken);
+      const result = await sendMail(prisma, mailer(), {
+        userId: booking.clientId,
+        to: booking.client.email,
+        type: "BOOKING_CONFIRMED",
+        dedupeKey: `BOOKING_CONFIRMED:${booking.id}:confirm`,
+        rendered: {
+          ...renderBookingConfirmed({
+            clientName: booking.client.name,
+            bookingCode: booking.code,
+            equipmentCode: booking.equipment.code,
+            equipmentName: booking.equipment.name,
+            startDate: booking.startDate,
+            endDate: booking.endDate,
+            dailyRate: num(booking.dailyRate) ?? 0,
+          }),
+          attachments: [
+            { filename: `${booking.code}.png`, content: png, contentType: "image/png" },
+          ],
+        },
+      });
+      emailed = result.sent;
+      emailError = result.error;
+    } catch (err) {
+      emailError = err instanceof Error ? err.message : String(err);
+      console.error("[confirm] booking confirmed but email failed", booking.code, emailError);
+    }
+
+    const { qrToken: _qrToken, ...safe } = booking;
+    return ok(c, {
+      ...serializeBooking(safe),
+      // Inline so the admin UI can show or print the QR without a second
+      // round trip. The raw token still never leaves the server on its own.
+      qrDataUrl: await qrDataUrl(booking.qrToken),
+      emailed,
+      ...(emailError ? { emailError } : {}),
+    });
+  },
+);
+
+/** A QR is only meaningful while the booking can still be scanned. */
+const QR_VISIBLE_STATUSES = ["CONFIRMED", "CHECKED_OUT"] as const;
+
+// ── GET /api/bookings/:id/qr.png ──────────────────────────────────────
+bookingRoutes.get("/:id/qr.png", validate("param", IdParam), async (c) => {
+  const { id } = valid(c, "param", IdParam);
+  const user = c.get("user");
+
+  // Owner or admin only — the QR is the credential, so this is the same guard
+  // as reading the booking itself.
+  const booking = await assertCanSeeBooking(user, id);
+
+  if (!(QR_VISIBLE_STATUSES as readonly string[]).includes(booking.status)) {
+    throw conflict(
+      booking.status === "PENDING"
+        ? "This booking has not been confirmed yet, so no QR has been issued"
+        : `This booking is ${booking.status.toLowerCase()} — its QR is no longer valid`,
+    );
+  }
+
+  const png = await qrPng(booking.qrToken);
+  return c.body(new Uint8Array(png), 200, {
+    "Content-Type": "image/png",
+    // The token rotates on confirm, so a cached image could outlive its token.
+    "Cache-Control": "no-store",
+    "Content-Disposition": `inline; filename="${booking.code}.png"`,
+  });
+});

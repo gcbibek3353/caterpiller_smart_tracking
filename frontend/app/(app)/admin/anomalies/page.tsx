@@ -89,7 +89,7 @@ export default function AdminAnomalies() {
         <p className="stamp text-stamp text-mute">Scanning the fleet…</p>
       ) : items.length === 0 ? (
         <Plate title="Anomalies" meta="0 matching">
-          <p className="text-body text-steel">Nothing matches this filter. Widen it, or that's genuinely good news.</p>
+          <p className="text-sm text-steel">Nothing matches this filter. Widen it, or that&apos;s genuinely good news.</p>
         </Plate>
       ) : (
         <div className="overflow-x-auto rounded-plate border border-line bg-plate">

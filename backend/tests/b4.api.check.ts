@@ -110,8 +110,9 @@ check("PATCH still sees OTHER bookings", collides("2026-09-12", "2026-09-15", "s
 // ─────────────────────────────────────────────────────────────────────
 // Part 2 · HTTP, RBAC, persistence
 // ─────────────────────────────────────────────────────────────────────
-// Set by scripts/with-test-db.ts, which runs the test stack on 4001 so it
-// cannot collide with a `bun run dev` server already holding 4000 against Neon.
+// Set by scripts/with-test-db.ts, which swaps DATABASE_URL for
+// TEST_DATABASE_URL and runs the test stack on 4001, so it cannot collide with
+// a `bun run dev` server already holding 4000 against Neon.
 const API = process.env.API_URL ?? "http://localhost:4000";
 const ORIGIN = "http://localhost:3000";
 

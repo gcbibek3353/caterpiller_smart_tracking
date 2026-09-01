@@ -239,17 +239,17 @@ truth — `backend/src/contracts/` wins any disagreement.
 
 - [ ] **B1** · H0–H0.75 — Contract workshop
 - [~] **B2** · H0.75–H2 — **QR camera spike** · *B — code merged to `main` (`b4696f4`): `frontend/app/spike/scan/page.tsx`. `qr-scanner` (nimiq) decoding, **manual code-entry input beside the camera from day one**, secure-context banner that shows `isSecureContext`/`mediaDevices` so a blocked camera can't be mistaken for a permissions bug, and a commented-out `@zxing/browser` fallback with the swap note inline. `bun run build` + `lint` clean; page prerenders (scanner is dynamic-imported, so SSR is safe).* **⚠️ Still missing: the phone test over LAN HTTPS — which is the entire point of B2.** Command + the `-H` gotcha are in *Environment quick start*. **Teammates: `bun install` in `frontend/` — two new deps.**
-- [ ] **B3** · H2–H3 — Booking UI on fixtures ⛔ *no deps* — browse/filter + booking form against `frontend/fixtures/*.json`
-- [ ] **B4** · H3–H5 — Booking API: `POST /api/bookings` with **overlap validation**, `GET` role-scoped, `GET`/`PATCH /:id` ⛔ *needs A3 ✅ + A4 ✅ — **unblocked***
+- [~] **B3** · H2–H3 — Booking UI on fixtures · *superseded — B7 landed straight onto the live API, so the fixture stage was skipped. Nothing outstanding.*
+- [x] **B4** · H3–H5 — Booking API · *B — `POST /api/bookings` with overlap validation, role-scoped `GET`, `GET`/`PATCH /:id`. Overlap semantics reused verbatim from `routes/equipment.ts` (inclusive bounds, blocking = PENDING/CONFIRMED/CHECKED_OUT) so the catalogue and the endpoint cannot disagree. Create runs Serializable + bounded retry, so two requests for one window cannot both win. **`bun run test:api:b4` — 67/67.***
   > 📐 **The overlap rule is already written and tested** in `GET /api/equipment?availableFrom=&availableTo=`
   > (`src/routes/equipment.ts`). Reuse it, don't re-derive it:
   > blocking statuses are `PENDING | CONFIRMED | CHECKED_OUT`; bounds are **inclusive**
   > (`startDate <= to && endDate >= from`), so a booking ending the 10th collides with one
   > starting the 10th. `bun run test:api` has 6 boundary cases pinning this down — if you
   > change the rule, run them.
-- [ ] **B5** · H5–H6.5 — Confirm + QR issuance: `qrToken = base64url(random 32B)`, opaque in DB, `GET /:id/qr.png`, payload `RENT:v1:<token>` and nothing else ⛔ *needs A5* — **stub `sendMail()` if D4 is late**
-- [ ] **B6** · H6–H8 — Scan state machine: `/api/scan/resolve` (preview) + `/api/scan/commit`. Wrap commit in `$transaction` and **re-read `booking.status` inside it** so a double-tap can't double-fire. Server decides check-out vs check-in from status, never the client.
-- [ ] **B7** · H8–H10 — Client UI live: browse → book → bookings list → QR page (render it **big**)
+- [x] **B5** · H5–H6.5 — Confirm + QR issuance · *B — `POST /:id/confirm` (ADMIN), `GET /:id/qr.png`, `lib/qr.ts`. Payload is `RENT:v1:<token>`; the prefix is imported from `contracts/scan.ts` and a check round-trips it back through `QrToken.parse`, so B6's reader cannot drift from the writer. **D4's mailer is wired for real, not stubbed.** ⚠️ `qrToken` is issued at CREATE, not confirm — the column is NOT NULL + @unique so a row cannot insert without one; it is never exposed and is rotated at confirm. **`test:api:b5` — 32/32.***
+- [x] **B6** · H6–H8 — Scan state machine · *B — `/api/scan/resolve` + `/commit`, ADMIN-only, §5 side effects complete (CheckEvent, equipment status, totalAmount, receipts). Server picks the action from status; a disagreeing body `action` is refused. **Found a real bug: a status guard alone let two concurrent commits both win — one CHECK_OUT then a legal CHECK_IN, leaving a booking RETURNED seconds after leaving the yard.** Both are valid transitions, so only a 10s rescan cooldown catches it. **`test:api:b6` — 44/44.***
+- [x] **B7** · H8–H10 — Client UI live · *B — `/equipment` (filter + availability window + booking dialog), `/bookings`, `/bookings/[id]` with a large QR. The QR is fetched as a **blob with credentials**, not an `<img src>` — the cookie only rides a cross-origin `<img>` while API and app are same-site, so the naive version works on localhost and breaks on the deploy (B10). **`test:api:b7` — 40/40** pins every field these pages read, since `frontend/lib/types.ts` is hand-duplicated and a rename there is a runtime bug, not a compile error.*
 - [ ] **B8** · H10–H12 — Admin bookings table: confirm / cancel, assign site + operator, filters
 - [ ] **B9** · H12–H14 — Admin scanner page for real: camera → preview card → meter/fuel/condition form → commit. **Ship the manual code-entry field next to the camera.**
 - [ ] **B10** · H14–H15 — Re-test scanner on the **deployed HTTPS URL from a phone** ⛔ *needs A11* — localhost proves nothing
@@ -340,13 +340,13 @@ Seed script · manual job triggers · manual QR entry fallback · the `theft` sc
 
 ## Demo running order — rehearse at H22 and H23.5
 
-- [ ] 1–2 · **B** — client books an excavator → admin confirms → QR issued, email visible in `/alerts`
-- [ ] 3 · **B** — scan the QR off a laptop screen with a phone → preview → meter + fuel → `CHECKED_OUT`
+- [~] 1–2 · **B** — client books an excavator → admin confirms → QR issued, email visible in `/alerts` · *API + client UI done (B4/B5/B7); needs the admin confirm button (B8) to drive it without curl*
+- [~] 3 · **B** — scan the QR off a laptop screen with a phone → preview → meter + fuel → `CHECKED_OUT` · *scan API done (B6); needs the scanner page (B9)*
 - [ ] 4 · **C** — `/asset/<id>`, charts + Leaflet breadcrumb moving live at 60×
 - [ ] 5 · **C→D** — `--scenario theft` → breach + night movement on the board, HIGH email **within 20s**. *This is the moment that sells it.*
 - [ ] 6 · **C** — 21-day range: idle-vs-working bars, fuel saw-tooth, temp threshold line
 - [ ] 7 · **D** — `/admin/forecast` — 8-week demand, interval band, MASE badge, recommendation sentences
-- [ ] 8 · **B** — scan the same QR again → routed to `CHECK_IN` → total computed, machine `AVAILABLE`, receipt
+- [~] 8 · **B** — scan the same QR again → routed to `CHECK_IN` → total computed, machine `AVAILABLE`, receipt · *scan API done (B6), incl. totalAmount and receipt; needs B9*
 
 **Have the `.sql` snapshot ready to restore in 30 seconds. Live demos break.**
 
@@ -396,6 +396,23 @@ bun run test:api     # terminal 2
 `dev:test` uses **port 4001** deliberately, so it cannot collide with a `bun run dev`
 already holding 4000 against Neon. That collision fails as a baffling
 `P2025 record not found`, not as a port error.
+
+The same guard is on every suite. With `dev:test` running in terminal 1:
+
+```bash
+bun run test:api        # A7  — equipment / site / operator CRUD + availability   28
+bun run test:api:b4     # B4  — booking create, overlap rule, role scoping        67
+bun run test:api:b5     # B5  — confirm, QR issuance, qr.png                      32
+bun run test:api:b6     # B6  — scan state machine, double-fire guard             44
+bun run test:api:b7     # B7  — response shapes the client booking pages read     40
+```
+
+**`with-test-db` also forces `MAIL_MODE=console`.** `MAIL_MODE` is `resend` with a live
+key, and the suites sign up fabricated clients (`c1@b.com`); confirming a booking sent a
+real Resend message to an address that does not exist, burning quota and collecting hard
+bounces against the sending domain on every run. Mail now lands in `backend/.mail/*.html`
+(gitignored). If you ran a booking-confirm flow before this landed, check the Resend
+dashboard for bounces.
 
 ### Neon gotchas, all three hit already
 

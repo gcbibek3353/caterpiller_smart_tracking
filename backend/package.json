@@ -18,6 +18,9 @@
     "seed:verify": "bun tests/seed.verify.ts",
     "test:api": "bun scripts/with-test-db.ts bun tests/a7.api.check.ts",
     "test:api:b4": "bun scripts/with-test-db.ts bun tests/b4.api.check.ts",
+    "test:api:b5": "bun scripts/with-test-db.ts bun tests/b5.api.check.ts",
+    "test:api:b6": "bun scripts/with-test-db.ts bun tests/b6.api.check.ts",
+    "test:api:b7": "bun scripts/with-test-db.ts bun tests/b7.contract.check.ts",
     "test:api:seed": "bun scripts/with-test-db.ts bun prisma/seed.ts",
     "db:dump": "bun scripts/db-snapshot.ts dump",
     "db:restore": "bun scripts/db-snapshot.ts restore",
@@ -27,14 +30,15 @@
   "dependencies": {
     "@hono/zod-validator": "^0.4.3",
     "@prisma/client": "^6.5.0",
-    "@rental/shared": "workspace:*",
     "better-auth": "^1.7.2",
     "croner": "^10.0.1",
     "hono": "^4.7.4",
+    "qrcode": "^1.5.4",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/qrcode": "^1.5.6",
     "prisma": "^6.19.3",
     "typescript": "^5"
   }
