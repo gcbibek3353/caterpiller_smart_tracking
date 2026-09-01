@@ -39,3 +39,13 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 export type Env = typeof env;
+
+/**
+ * Function form of `env`, for the modules written against it
+ * (`src/app.ts`, `middleware/ingest-auth.ts`, `backend/index.ts`).
+ *
+ * The schema is parsed once at module load, so this is a plain accessor and not
+ * a re-parse. Both forms are supported deliberately: renaming either one would
+ * break the other half of the codebase mid-hackathon.
+ */
+export const loadEnv = (): Env => env;

@@ -1,11 +1,11 @@
 {
   "name": "backend",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run --hot index.ts",
-    "start": "bun run index.ts",
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:push": "prisma db push",
@@ -23,6 +23,7 @@
     "@hono/zod-validator": "^0.4.3",
     "@prisma/client": "^6.5.0",
     "@rental/shared": "workspace:*",
+    "better-auth": "^1.7.2",
     "hono": "^4.7.4",
     "zod": "^3.24.2"
   },
