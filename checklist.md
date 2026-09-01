@@ -32,19 +32,20 @@
 | **B** | **B4 — Booking API** | ✅ contracts + auth guards + `validate()` all landed |
 | **B** | **B5/B6 — confirm, QR, scan** | ✅ `requireRole("ADMIN")` and `ScanCommitInput` ready (still stub `sendMail()` until D4) |
 | **C** | **C4 — Ingest + rollup** | ✅ `requireApiKey` + `IngestInput` (accepts bare array *or* `{ticks:[]}`) ready |
-| **D** | **D4 — Mailer** | ✅ `Notification` model live |
+| **D** | **D4 — Mailer** | ✅ `Notification` model live · **done, real send verified** |
+| **B** | B5 confirm + QR email | ✅ `sendMail()` is real now — import `services/mailer/service.ts`, no need to stub |
 | **A** | A7 — Equipment/Site/Operator CRUD | Next on A's list |
 
 ## 🚧 Blocked right now
 
 | Task | Waiting on |
 |---|---|
-| B5 confirm + QR email | A5 (ADMIN guard) · D4 (`sendMail`) — **stub the mail call, don't wait** |
 | C7 asset page charts | A8 (seeded data) |
-| D5 detector runner · D6 forecast runner | A8 (seeded data) |
 | A9 real rollup in seed | C4 (rollup service) |
 | B10 phone scanner re-test | A11 (deploy) |
-| C12 asset timeline | D5 (anomalies exist) |
+| C12 asset timeline | ✅ unblocked — D5 anomalies exist now |
+| D8 `/admin/anomalies`, D10 `/alerts` | A10 (frontend shell/auth — no login page exists to reach an authenticated route yet) |
+| D9 `/admin/forecast` | A10 **and** C3 (chart components) |
 
 ---
 
@@ -168,13 +169,13 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **D2** · H0.75–H3.5 — **`lib/stats.ts` + forecasting. ZERO deps, zero DB.** · *done — `median`/`mad`/`robustZ`/`ewma`/`mae`/`mase`/`smape`/`haversine`/`stddev` unit-tested; `services/forecast/`: demand-series builder (rental-days), seasonal-naive, Holt-Winters + α/β/γ grid search, rolling-origin backtest, prediction intervals, recommendation-sentence builder + cold-start check. 43 tests passing.*
 - [-] **D2b** — Ridge regression model (§8C) — **cut for 24h.** Two models + an honest MASE beats three half-wired.
 - [x] **D3** · H3.5–H5 — Every anomaly detector as a pure function ⛔ *no deps* · *done — all daily/realtime/booking rules from §9, plus layer-2 robust-z + EWMA (ahead of schedule). Thresholds centralized in `services/anomaly/config.ts`. 53 tests passing.*
-- [~] **D4** · H5–H6.5 — Mailer ⛔ *needs A3 ✅* · *DB-free half done: all 7 templates, console transport (`.mail/*.html`), Resend transport (talks to Resend's HTTP API directly, no SDK dep), `MAIL_MODE`-driven `createMailTransport()` factory, pure `Notification` PENDING→SENT/FAILED builder. Verified end-to-end against real `env.ts` with `MAIL_MODE=resend` + a `RESEND_API_KEY` in `backend/.env` (gitignored, not committed). **Still missing: the actual Prisma `Notification` row write** (needs a live DB — this is what makes `sendMail()` real for B to import) **and the QR-PNG attachment wiring**, which is Person B's `lib/qr.ts` output, not built here.*
-- [ ] **D5** · H6.5–H8 — Detector runner + dedupe ⛔ *needs A8* — `dedupeKey = "{type}:{equipmentId}:{dayBucket}"` (hour bucket for realtime) behind the unique index. **Build dedupe WITH the detector, not after** — without it one stuck machine emits 144 emails. Then `GET /api/anomalies` (role-scoped), `PATCH /:id`, `POST /api/anomalies/run`.
-- [ ] **D6** · H8–H9.5 — Forecast runner on real data ⛔ *needs A8* — build series from seeded bookings, run both models, pick by MASE, write `DemandForecast`. **Generate the recommendation sentences** — they're what people remember.
-- [ ] **D7** · H9.5–H11 — Scheduler (`croner`): 10-min realtime, hourly booking rules + digest flush, daily rollup → daily detectors, weekly forecast retrain. `isRunning` guard. **Every job also gets a manual POST trigger.**
-- [ ] **D8** · H11–H13 — `/admin/anomalies` — severity-sorted table, filters, acknowledge / resolve / false-positive
-- [ ] **D9** · H13–H15 — `/admin/forecast` ⛔ *uses C3's charts* — interval band, **MASE badge on screen**, recommendation list, week each type first crosses 85%
-- [ ] **D10** · H15–H17 — `/alerts` page — notification + anomaly feed (shown on stage instead of a real mail client)
+- [x] **D4** · H5–H6.5 — Mailer ⛔ *needs A3 ✅* · *done — all 7 templates, console transport (`.mail/*.html`), Resend transport (direct HTTP, no SDK dep), `MAIL_MODE`-driven `createMailTransport()` factory, `services/mailer/service.ts::sendMail()` writes the `Notification` row `PENDING` → `SENT`/`FAILED` for real (Prisma-wired). **Verified against a live Postgres + a real Resend send** — domain `krishalkarna.com.np` is verified, sent to an external inbox, not just the account owner. Idempotent re-send on the same `dedupeKey` confirmed (no double-send). `sendMail()` is importable by B now — no more stub needed. QR-PNG attachment itself is still Person B's `lib/qr.ts` output, not built here.*
+- [x] **D5** · H6.5–H8 — Detector runner + dedupe · *done — `services/anomaly/runner.ts`: `runDailyAnomalyRules`/`runRealtimeAnomalyRules`/`runBookingAnomalyRules`/`runAllAnomalyRules`, all Prisma-wired, joining `booking.status`/`siteId` into `DailyUsage` rows and resolving each equipment's active-booking site for geofence checks. `dedupeKey` + `createMany({skipDuplicates:true})`, same idiom as ingest. `routes/anomalies.ts`: `GET /api/anomalies` (role-scoped), `PATCH /:id`, `POST /api/anomalies/run`. **Verified live**: inserted a real HIGH_IDLE-shaped `DailyUsage` row + an overdue `Booking` on a throwaway Neon Postgres, ran the detectors, confirmed the exact `Anomaly` rows landed with correct `dedupeKey`/severity, re-ran and confirmed 0 duplicates, cleaned up. `UPCOMING_RETURN` is correctly kept out of the `Anomaly` table (informational, not an anomaly — steps.md §9) and returned separately for whoever wires `RETURN_REMINDER`.*
+- [x] **D6** · H8–H9.5 — Forecast runner on real data · *done — `services/forecast/runner.ts`: builds the daily series from real bookings, backtests both seasonal-naive and Holt-Winters (grid-searched), picks the lower-MASE model, writes `DemandForecast` with intervals + recommendation sentences. Cold-start (<60 days history) correctly falls back to seasonal-naive only. `routes/forecast.ts`: `GET /api/forecast/demand` (latest generation per type), `POST /api/forecast/run`. **Verified live** against the same throwaway DB — one booking's worth of history correctly triggered `lowConfidence: true` + seasonal-naive fallback + a real recommendation sentence.*
+- [x] **D7** · H9.5–H11 — Scheduler (`croner`) · *done — `jobs/scheduler.ts`: 10-min realtime, hourly booking rules, daily 00:15 detectors, weekly Sun 02:00 forecast retrain, `isRunning` guard per job. Mounted in `index.ts` (skipped when `NODE_ENV=test`). Manual POST triggers are the D5/D6 routes above. Note: the daily job runs the *detectors* only — Person C's actual rollup (Telemetry→DailyUsage, C4) isn't called first since that's not D's file; wire that call in once C4 lands.*
+- [ ] **D8** · H11–H13 — `/admin/anomalies` ⛔ ***genuinely blocked, not skipped*** — needs **A10** (no login page/`authClient` exists yet, so there's no way to reach an authenticated admin route in the browser). Backend (`GET/PATCH /api/anomalies`) is done and tested; there is nothing on the frontend to connect it to yet.
+- [ ] **D9** · H13–H15 — `/admin/forecast` ⛔ *needs **A10** and* **C3's charts** *(neither exists yet)* — backend (`GET /api/forecast/demand`) is done and tested.
+- [ ] **D10** · H15–H17 — `/alerts` page ⛔ *needs **A10*** — same auth-shell blocker as D8.
 - [ ] **D11** · H17–H21 — 😴 Sleep
 - [ ] **D12** · H21–H23 — Threshold tuning: `--scenario theft` end to end, breach → anomaly → HIGH email **under 20s**
 - [ ] **D13** · H23–H24 — Rehearsal — D drives demo steps 5 and 7

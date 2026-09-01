@@ -14,6 +14,13 @@ export function toISODate(d: Date): string {
   return startOfDay(d).toISOString().slice(0, 10);
 }
 
+/** Monday of the week containing `d` — `DemandForecast.periodStart` is always a Monday (steps.md §2). */
+export function startOfWeekMonday(d: Date): Date {
+  const day = startOfDay(d).getDay(); // 0=Sun..6=Sat
+  const daysSinceMonday = (day + 6) % 7;
+  return addDays(startOfDay(d), -daysSinceMonday);
+}
+
 /**
  * Daily demand series: for each day in [start, end] (inclusive), the number
  * of bookings of `type` that were "on rent" that day (start <= day <= end,

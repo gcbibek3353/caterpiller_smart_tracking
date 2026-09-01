@@ -6,6 +6,9 @@ import { prisma } from "./db";
 import { ok } from "./lib/http";
 import { onError, onNotFound } from "./middleware/error";
 import { authRoutes } from "./routes/auth";
+import { anomalyRoutes } from "./routes/anomalies";
+import { forecastRoutes } from "./routes/forecast";
+import { startScheduler } from "./jobs/scheduler";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -51,8 +54,12 @@ app.route("/api/auth", authRoutes); // A5 ✅
 // app.route("/api/bookings",  bookingRoutes);    // B4
 // app.route("/api/scan",      scanRoutes);       // B6
 // app.route("/api/telemetry", telemetryRoutes);  // C4
-// app.route("/api/anomalies", anomalyRoutes);    // D5
-// app.route("/api/forecast",  forecastRoutes);   // D6
+app.route("/api/anomalies", anomalyRoutes); // D5 ✅
+app.route("/api/forecast", forecastRoutes); // D6 ✅
+
+// In-process cron: realtime detectors, booking rules, daily detectors,
+// weekly forecast retrain — every one also has a manual POST trigger above.
+if (env.NODE_ENV !== "test") startScheduler();
 
 console.log(`🚜 API listening on http://localhost:${env.PORT}`);
 console.log(`   health → http://localhost:${env.PORT}/health`);
