@@ -110,8 +110,14 @@ bookingRoutes.post("/", validate("json", CreateBookingInput), async (c) => {
    * A DB-level exclusion constraint would be stronger, but that needs a schema
    * change and only A edits schema.prisma.
    */
-  const attempt = async () =>
-    prisma.$transaction(
+  const attempt = async () => {
+    // Generated OUTSIDE the transaction: calling the global client from inside
+    // an interactive transaction borrows a second pooled connection while the
+    // first is still held, which deadlocks once the pool is busy. A collision
+    // here is a P2002 and is retried below.
+    const code = await nextBookingCode();
+
+    return prisma.$transaction(
       async (tx) => {
         const clash = await tx.booking.findFirst({
           where: overlapWhere(body.equipmentId, body.startDate, body.endDate),
@@ -140,7 +146,7 @@ bookingRoutes.post("/", validate("json", CreateBookingInput), async (c) => {
 
         return tx.booking.create({
           data: {
-            code: await nextBookingCode(),
+            code,
             equipmentId: body.equipmentId,
             clientId,
             siteId: body.siteId ?? null,
@@ -166,6 +172,7 @@ bookingRoutes.post("/", validate("json", CreateBookingInput), async (c) => {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+  };
 
   let created;
   for (let i = 0; i < 3; i++) {
