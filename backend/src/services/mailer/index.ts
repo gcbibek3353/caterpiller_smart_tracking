@@ -11,3 +11,4 @@ export * from "./templates/anomalyAlert";
 export * from "./templates/anomalyDigest";
 export * from "./transport/console";
 export * from "./transport/resend";
+export * from "./transport/factory";
