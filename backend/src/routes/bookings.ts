@@ -6,7 +6,7 @@ import { badRequest, conflict, notFound, ok } from "../lib/http";
 import { paginated, serializeBooking } from "../lib/serialize";
 import { assertCanSeeBooking, requireAuth } from "../middleware/auth";
 import { valid, validate } from "../middleware/validate";
-import { CreateBookingInput, IdParam } from "../contracts";
+import { BookingListQuery, CreateBookingInput, IdParam } from "../contracts";
 import type { AppEnv, SessionUser } from "../types";
 
 export const bookingRoutes = new Hono<AppEnv>();
@@ -179,4 +179,57 @@ bookingRoutes.post("/", validate("json", CreateBookingInput), async (c) => {
   // qrToken is deliberately withheld: it is issued to the client at /confirm.
   const { qrToken: _qrToken, ...safe } = created;
   return ok(c, serializeBooking(safe), 201);
+});
+
+// ── GET /api/bookings ─────────────────────────────────────────────────
+bookingRoutes.get("/", validate("query", BookingListQuery), async (c) => {
+  const q = valid(c, "query", BookingListQuery);
+  const user = c.get("user");
+
+  const where: Prisma.BookingWhereInput = {};
+
+  /**
+   * Role scoping, enforced in the route and not the UI (steps.md §3).
+   * A CLIENT is pinned to their own id, so `?clientId=` from a client is
+   * ignored rather than honoured — otherwise the filter is an enumeration hole.
+   */
+  if (user.role === "ADMIN") {
+    if (q.clientId) where.clientId = q.clientId;
+  } else {
+    where.clientId = user.id;
+  }
+
+  if (q.status) where.status = q.status;
+  if (q.equipmentId) where.equipmentId = q.equipmentId;
+
+  // `from`/`to` select bookings that INTERSECT the window, not ones contained
+  // by it — same inclusive-bounds rule as the overlap check above.
+  if (q.from) where.endDate = { gte: q.from };
+  if (q.to) where.startDate = { lte: q.to };
+
+  // Still out with the return date behind us. Matches the [status, endDate] index.
+  if (q.overdue) {
+    where.status = "CHECKED_OUT";
+    where.endDate = { ...(where.endDate as object), lt: new Date() };
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.booking.findMany({
+      where,
+      orderBy: [{ startDate: "desc" }],
+      skip: (q.page - 1) * q.limit,
+      take: q.limit,
+      include: {
+        equipment: { select: { id: true, code: true, name: true, type: true, imageUrl: true } },
+        client: { select: { id: true, name: true, companyName: true } },
+        site: { select: { id: true, name: true } },
+        operator: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.booking.count({ where }),
+  ]);
+
+  // qrToken never travels in a list response.
+  const items = rows.map(({ qrToken: _qrToken, ...b }) => serializeBooking(b));
+  return ok(c, paginated(items, total, q.page, q.limit));
 });
