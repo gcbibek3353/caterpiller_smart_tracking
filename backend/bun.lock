@@ -6,14 +6,15 @@
       "name": "backend",
       "dependencies": {
         "@hono/zod-validator": "^0.4.3",
-        "@prisma/client": "^6.5.0",
+        "@prisma/client": "^6.19.3",
         "better-auth": "^1.7.2",
+        "croner": "^10.0.1",
         "hono": "^4.7.4",
         "zod": "^3.24.2",
       },
       "devDependencies": {
         "@types/bun": "latest",
-        "prisma": "^6.5.0",
+        "prisma": "^6.19.3",
         "typescript": "^5",
       },
     },
@@ -80,6 +81,8 @@
     "confbox": ["confbox@0.2.4", "", {}, "sha512-ysOGlgTFbN2/Y6Cg3Iye8YKulHw+R2fNXHrgSmXISQdMnomY6eNDprVdW9R5xBguEqI954+S6709UyiO7B+6OQ=="],
 
     "consola": ["consola@3.4.2", "", {}, "sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA=="],
+
+    "croner": ["croner@10.0.1", "", {}, "sha512-ixNtAJndqh173VQ4KodSdJEI6nuioBWI0V1ITNKhZZsO0pEMoDxz539T4FTTbSZ/xIOSuDnzxLVRqBVSvPNE2g=="],
 
     "deepmerge-ts": ["deepmerge-ts@7.1.5", "", {}, "sha512-HOJkrhaYsweh+W+e74Yn7YStZOilkoPb6fycpwNLKzSPtruFs48nYis0zy5yJz1+ktUhHxoRDJ27RQAWLIJVJw=="],
 

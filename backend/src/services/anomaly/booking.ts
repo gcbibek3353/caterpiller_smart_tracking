@@ -5,9 +5,12 @@ import type { AnomalyCandidate, BookingRuleInput } from "./types";
 /** Booking rules, run hourly (steps.md §9). Pure: no DB access. */
 
 export function detectOverdue(booking: BookingRuleInput, now: Date): AnomalyCandidate[] {
-  const { highSeverityAfterHours } = ANOMALY_CONFIG.overdue;
-  if (booking.status !== "CHECKED_OUT" || now <= booking.endDate) return [];
-  const hoursOverdue = (now.getTime() - booking.endDate.getTime()) / 3_600_000;
+  const { graceDays, highSeverityAfterHours } = ANOMALY_CONFIG.overdue;
+  // endDate is the last rental day, inclusive — due back is the end of that
+  // day, not the start of it. See the config.ts comment on `graceDays`.
+  const dueBy = new Date(booking.endDate.getTime() + graceDays * 86_400_000);
+  if (booking.status !== "CHECKED_OUT" || now <= dueBy) return [];
+  const hoursOverdue = (now.getTime() - dueBy.getTime()) / 3_600_000;
   const severity = hoursOverdue >= highSeverityAfterHours ? "HIGH" : "MEDIUM";
   return [
     {
@@ -15,7 +18,7 @@ export function detectOverdue(booking: BookingRuleInput, now: Date): AnomalyCand
       severity,
       equipmentId: booking.equipmentId,
       bookingId: booking.id,
-      windowStart: booking.endDate,
+      windowStart: dueBy,
       windowEnd: now,
       metric: "hoursOverdue",
       value: hoursOverdue,

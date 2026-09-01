@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { buildDemandSeries, toWeekly } from "./series";
+import { buildDemandSeries, startOfWeekMonday, toISODate, toWeekly } from "./series";
 import type { BookingLike } from "./types";
 
 function d(iso: string): Date {
@@ -46,5 +46,22 @@ describe("toWeekly", () => {
   test("sums 7-day chunks and drops a trailing partial week", () => {
     const daily = [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 5, 5];
     expect(toWeekly(daily)).toEqual([7, 14]);
+  });
+});
+
+describe("startOfWeekMonday", () => {
+  test("a Thursday rolls back to that week's Monday", () => {
+    // 2026-01-01 is a Thursday
+    expect(toISODate(startOfWeekMonday(d("2026-01-01")))).toBe("2025-12-29");
+  });
+
+  test("a Monday is its own start of week", () => {
+    // 2026-01-05 is a Monday
+    expect(toISODate(startOfWeekMonday(d("2026-01-05")))).toBe("2026-01-05");
+  });
+
+  test("a Sunday rolls back to the Monday 6 days earlier", () => {
+    // 2026-01-04 is a Sunday
+    expect(toISODate(startOfWeekMonday(d("2026-01-04")))).toBe("2025-12-29");
   });
 });

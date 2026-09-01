@@ -11,6 +11,16 @@
  * ⚠️  DESTRUCTIVE: truncates users, equipment, sites, operators and bookings.
  * Run it against the local dev database only, never a seeded demo DB you care about.
  *
+ * Named `.check.ts`, not `.test.ts`, ON PURPOSE — it's a standalone script
+ * (top-level `process.exit()`, no `test()`/`describe()`), not a bun:test
+ * suite. `bun test` recursively runs every `*.test.ts` it finds; if this
+ * file matched that glob, a plain `bun test` at the project root would
+ * silently TRUNCATE whatever DB `DATABASE_URL` points at, then this file's
+ * `process.exit()` would kill the whole test run before any real unit
+ * tests got a chance to execute — no error, no warning, everyone's tests
+ * just silently don't run. Confirmed this happening while merging in D's
+ * branch. Keep it out of the `*.test.ts` glob.
+ *
  * The overlap boundary cases below are the contract B4 must preserve when it
  * adds booking creation. If you change the blocking-status list or the
  * inclusive bounds, these tests are what tells you what you broke.

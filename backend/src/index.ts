@@ -11,9 +11,14 @@ import { authRoutes } from "./routes/auth";
 import { equipmentRoutes } from "./routes/equipment";
 import { siteRoutes } from "./routes/sites";
 import { operatorRoutes } from "./routes/operators";
-import { bookingRoutes } from "./routes/bookings";
+import { anomalyRoutes } from "./routes/anomalies";
+import { forecastRoutes } from "./routes/forecast";
+import { notificationRoutes } from "./routes/notifications";
 import { telemetry, jobs } from "./routes/telemetry";
 import { equipmentAnalytics, fleetAnalytics } from "./routes/equipment-analytics";
+import { bookingRoutes } from "./routes/bookings";
+import { startScheduler } from "./jobs/scheduler";
+import { requireRole } from "./middleware/auth";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -56,25 +61,29 @@ app.get("/health", async (c) => {
 // ── Route modules mount here as each owner lands them ──
 app.route("/api/auth", authRoutes); // A5 ✅
 app.route("/api/equipment", equipmentRoutes); // A7 ✅
+// Analytics only defines sub-paths (/:id/summary, /:id/timeseries, /:id/track,
+// /:id/daily), so it shares the /api/equipment prefix with A's CRUD router
+// without shadowing it, and sits behind equipmentRoutes' real requireAuth.
+app.route("/api/equipment", equipmentAnalytics); // C6 ✅
 app.route("/api/sites", siteRoutes); // A7 ✅
 app.route("/api/operators", operatorRoutes); // A7 ✅
 app.route("/api/bookings", bookingRoutes); // B4 ✅
 // app.route("/api/scan",      scanRoutes);       // B6
-app.route("/api/telemetry", telemetry); // C4 ✅
+app.route("/api/telemetry", telemetry); // C4 ✅ — machine-to-machine, guards itself via x-api-key
+app.use("/api/jobs/*", requireAuth, requireRole("ADMIN")); // rollup trigger had no guard at all
 app.route("/api/jobs", jobs); // C4 ✅
-// Analytics only defines sub-paths (/:id/summary, /:id/timeseries, /:id/track,
-// /:id/daily), so it shares the /api/equipment prefix with A's CRUD router
-// without shadowing it. It now sits behind equipmentRoutes' real requireAuth
-// instead of the x-dev-role stub in src/app.ts.
-app.route("/api/equipment", equipmentAnalytics); // C6 ✅
-// fleetAnalytics reads c.get("user") and 403s without one. Under src/app.ts
-// that was filled by the x-dev-role stub; here it needs the real session guard,
-// otherwise even a signed-in ADMIN gets 403. equipmentAnalytics does not need
-// this line — it inherits requireAuth from equipmentRoutes' /api/equipment/*.
+// fleetAnalytics reads c.get("user") and 403s without one, and (unlike
+// equipmentAnalytics) has no CRUD sibling router at this prefix to inherit
+// requireAuth from — needs its own line or even a signed-in ADMIN gets 403.
 app.use("/api/analytics/*", requireAuth);
 app.route("/api/analytics", fleetAnalytics); // C6 ✅
-// app.route("/api/anomalies", anomalyRoutes);    // D5
-// app.route("/api/forecast",  forecastRoutes);   // D6
+app.route("/api/anomalies", anomalyRoutes); // D5 ✅
+app.route("/api/forecast", forecastRoutes); // D6 ✅
+app.route("/api/notifications", notificationRoutes); // D10 ✅ — feed for the /alerts page
+
+// In-process cron: realtime detectors, booking rules, daily detectors,
+// weekly forecast retrain — every one also has a manual POST trigger above.
+if (env.NODE_ENV !== "test") startScheduler();
 
 console.log(`🚜 API listening on http://localhost:${env.PORT}`);
 console.log(`   health → http://localhost:${env.PORT}/health`);
