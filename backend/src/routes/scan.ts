@@ -7,6 +7,7 @@ import { num, serializeBooking } from "../lib/serialize";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { valid, validate } from "../middleware/validate";
 import { ScanCommitInput, ScanResolveInput } from "../contracts";
+import { isBookingOverdue } from "../lib/overdue";
 import { mailer } from "../lib/mail";
 import { sendMail } from "../services/mailer/service";
 import { renderCheckoutReceipt } from "../services/mailer/templates/checkoutReceipt";
@@ -93,7 +94,7 @@ scanRoutes.post("/resolve", validate("json", ScanResolveInput), async (c) => {
     // Prefill for the meter/fuel form on a check-in, so staff correct a number
     // rather than type one from scratch.
     lastCheckout,
-    isOverdue: booking.status === "CHECKED_OUT" && booking.endDate < new Date(),
+    isOverdue: isBookingOverdue(booking.status, booking.endDate),
   });
 });
 

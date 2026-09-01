@@ -40,7 +40,7 @@
 | **D** | **D8 — `/admin/anomalies`** | ✅ done, see below |
 | **D** | **D9 — `/admin/forecast`** | ✅ done, see below (built C3's chart primitives too — nobody else had picked them up yet) |
 | **D** | **D10 — `/alerts`** | ✅ done, see below |
-| **A** | A11 — deploy | A9 still needs C4 |
+| **A** | A11 — deploy | A9 still needs C4 · **now also blocks B10, the last unretired demo risk** |
 
 ## 🚧 Blocked right now
 
@@ -118,6 +118,31 @@ C3 spec — C7/C12 can feed them real endpoint data with no changes needed.
 
 ---
 
+## 📦 What B has shipped that you can import right now
+
+**Pages live now:** `/admin/equipment` · `/admin/bookings` · `/admin/scanner` — all three admin
+nav links resolve, so the shell has no dead entries left.
+
+**Frontend primitives — reuse these instead of retyping the class strings:**
+```tsx
+import { Select } from "@/components/ui/select";       // Field, but a <select>
+import { TextArea } from "@/components/ui/textarea";   // Field, but multi-line
+import { Dialog, Drawer } from "@/components/ui/dialog"; // modal / right-hand panel, Esc + backdrop
+import { CameraScanner } from "@/components/scan/CameraScanner";
+// <CameraScanner onToken={(raw) => …} paused={showingPreview} />
+```
+`CameraScanner` is B2's spike, generalised: camera + manual entry side by side, the
+secure-context banner, repeat-decode collapsing, and a `paused` prop that freezes the feed
+without releasing the camera. It emits the raw string — `QrToken` on the backend takes the
+full `RENT:v1:` payload or a bare token, so manual entry needs no special casing.
+
+**New wire types in `frontend/lib/types.ts`:** `BookingWithRelations`, `ConfirmedBooking`,
+`ScanPreview`, `ScanReceipt`, `CheckEvent`, `CheckType`.
+
+**Two endpoints gained a filter** (they had none, and the assign dropdowns needed one):
+`GET /api/sites?clientId=` · `GET /api/operators?clientId=` — ADMIN only, ignored for a
+CLIENT exactly like `GET /api/bookings?clientId=`.
+
 ## 🌱 The seeded database — what's in it for you
 
 ```bash
@@ -139,7 +164,7 @@ Logins: `admin@rental.com / admin123` · `client@build.com / client123`
 It targets local Postgres on :4001 (`bun run db:up` + `bun run dev:test`), and the test file
 hard-refuses any non-localhost `DATABASE_URL`. See *Environment quick start*.
 
-### 📐 One semantic D needs to decide
+### ✅ Resolved — the overdue grace day (was: "one semantic D needs to decide")
 `endDate` is stored at **midnight UTC of the last rental day**, and the availability
 rule treats it as **inclusive** (a booking ending the 10th blocks a booking starting
 the 10th). So the naive `OVERDUE` rule `now > endDate` fires at 00:01 on the return
@@ -147,6 +172,14 @@ day, before the machine could possibly be back. **Use `now > endDate + 1 day`** 
 the demo shows every active rental as overdue. The seed follows the inclusive reading:
 on-time returns land in business hours *of* `endDate`; the 39 genuinely-late ones are
 a calendar day or more past it.
+
+**Now implemented**, on that recommendation, in `backend/src/lib/overdue.ts` —
+`isBookingOverdue()` and `overdueCutoff()`. All four places that had the rule now import
+it: the `?overdue=true` list filter, `isOverdue` on the booking detail, `isOverdue` on the
+scan preview, and **`isOverdue` on every list row**, which the list endpoint never used to
+send at all — `/admin/bookings` needs it to badge a row, and the client `/bookings` page was
+re-deriving it in the browser. **D/A: say so if you want the grace day gone**, it is one
+constant in one file. Until then the two definitions cannot drift, which they already had.
 
 ---
 
@@ -227,6 +260,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **A8** · H5.5–H9 — **`prisma/seed.ts`** · ***12.3s** (budget was 90s). 6 users, 40 machines, 639 bookings, 54k ticks, 7.7k DailyUsage, 1.1k check events. **Re-runnable and deterministic** — 3 consecutive runs give byte-identical data. Snapshot committed at `prisma/snapshot.sql` (9.4 MB, restores in 1.1s). 13 structure assertions pass via `bun run seed:verify`.*
 - [ ] **A9** · H9–H9.5 — Swap in C's real rollup for the last 21 days ⛔ *needs C4; skip if late*
 - [x] **A10** · H9.5–H11 — Frontend shell + auth pages · *role-aware nav, login + register, protected route, `apiFetch()`, `useApi()`, and the **"data plate" design system**. Verified in a real browser: both roles sign in, a CLIENT hitting `/admin` is bounced to `/dashboard`.*
+- [x] **A7b** · — `/admin/equipment` · *table (search / type / status filters, pagination) + create-edit drawer over all 14 fields + retire / reactivate. **This page had no task and no owner** — A7 shipped the API and the nav credited the page to it, but no line item said to build it. Built alongside B8/B9; reassign if that was someone's plan. Retire goes through DELETE (which refuses a machine with live bookings), so RETIRED is deliberately absent from the drawer's status select — offering it there would route around that guard and strand a checked-out machine.*
 - [ ] **A11** · H11–H13 — **Deploy** (budget the full 2h — the cross-origin session cookie is the trap)
 - [ ] **A12** · H13–H17 — 😴 Sleep
 - [ ] **A13** · H17–H20 — Integration lead: merge everyone, drive the walkthrough, own the bug list
@@ -250,8 +284,8 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **B5** · H5–H6.5 — Confirm + QR issuance · *B — `POST /:id/confirm` (ADMIN), `GET /:id/qr.png`, `lib/qr.ts`. Payload is `RENT:v1:<token>`; the prefix is imported from `contracts/scan.ts` and a check round-trips it back through `QrToken.parse`, so B6's reader cannot drift from the writer. **D4's mailer is wired for real, not stubbed.** ⚠️ `qrToken` is issued at CREATE, not confirm — the column is NOT NULL + @unique so a row cannot insert without one; it is never exposed and is rotated at confirm. **`test:api:b5` — 32/32.***
 - [x] **B6** · H6–H8 — Scan state machine · *B — `/api/scan/resolve` + `/commit`, ADMIN-only, §5 side effects complete (CheckEvent, equipment status, totalAmount, receipts). Server picks the action from status; a disagreeing body `action` is refused. **Found a real bug: a status guard alone let two concurrent commits both win — one CHECK_OUT then a legal CHECK_IN, leaving a booking RETURNED seconds after leaving the yard.** Both are valid transitions, so only a 10s rescan cooldown catches it. **`test:api:b6` — 44/44.***
 - [x] **B7** · H8–H10 — Client UI live · *B — `/equipment` (filter + availability window + booking dialog), `/bookings`, `/bookings/[id]` with a large QR. The QR is fetched as a **blob with credentials**, not an `<img src>` — the cookie only rides a cross-origin `<img>` while API and app are same-site, so the naive version works on localhost and breaks on the deploy (B10). **`test:api:b7` — 40/40** pins every field these pages read, since `frontend/lib/types.ts` is hand-duplicated and a rename there is a runtime bug, not a compile error.*
-- [ ] **B8** · H10–H12 — Admin bookings table: confirm / cancel, assign site + operator, filters
-- [ ] **B9** · H12–H14 — Admin scanner page for real: camera → preview card → meter/fuel/condition form → commit. **Ship the manual code-entry field next to the camera.**
+- [x] **B8** · H10–H12 — Admin bookings table · *`/admin/bookings` — status chips + overdue-only + window filters, confirm / cancel, and a dispatch dialog for site + operator + extending the return date. **Confirm renders the QR inline** from `qrDataUrl`, which `POST /:id/confirm` already returned and nothing was reading — so demo step 1–2 no longer needs curl. Two backend gaps had to close first: `GET /api/sites|/api/operators` had **no `clientId` filter**, so the assign dropdowns would have offered every client's yards at once; and `PATCH /:id` checked only that a site *existed*, not that it belonged to this booking's client — a cross-client dispatch was accepted. Both fixed and pinned.*
+- [x] **B9** · H12–H14 — Admin scanner page for real · *`/admin/scanner` — a four-state machine (idle → preview → committed, plus refused), camera and **manual code entry side by side**, both feeding one path. B2's spike is now `components/scan/CameraScanner.tsx`, restyled onto the plate. Check-in prefills the meter from `lastCheckout` and warns if the new reading is *lower* than the check-out one. The camera **pauses** rather than stops while a preview is up — stopping re-prompts for permission on some phones between every scan. All three refusals (rescan cooldown, PENDING booking, already used) render as readable states, and the PENDING 409's `details.booking` is used to still show what was scanned. Location is opt-in, off by default — no permission prompt mid-demo.* ⚠️ **Still laptop-only — see B10.**
 - [ ] **B10** · H14–H15 — Re-test scanner on the **deployed HTTPS URL from a phone** ⛔ *needs A11* — localhost proves nothing
 - [ ] **B11** · H15–H17 — Edge cases: used QR, cancelled booking, `PENDING` rejection, booking detail, overdue badges
 - [ ] **B12** · H17–H21 — 😴 Sleep
@@ -340,13 +374,13 @@ Seed script · manual job triggers · manual QR entry fallback · the `theft` sc
 
 ## Demo running order — rehearse at H22 and H23.5
 
-- [~] 1–2 · **B** — client books an excavator → admin confirms → QR issued, email visible in `/alerts` · *API + client UI done (B4/B5/B7); needs the admin confirm button (B8) to drive it without curl*
-- [~] 3 · **B** — scan the QR off a laptop screen with a phone → preview → meter + fuel → `CHECKED_OUT` · *scan API done (B6); needs the scanner page (B9)*
+- [x] 1–2 · **B** — client books an excavator → admin confirms → QR issued, email visible in `/alerts` · *end to end in the UI now — Confirm on `/admin/bookings` shows the QR inline and says whether the mail sent*
+- [~] 3 · **B** — scan the QR off a laptop screen with a phone → preview → meter + fuel → `CHECKED_OUT` · *page done (B9); **the phone-over-HTTPS run is still outstanding** — B2/B10*
 - [ ] 4 · **C** — `/asset/<id>`, charts + Leaflet breadcrumb moving live at 60×
 - [ ] 5 · **C→D** — `--scenario theft` → breach + night movement on the board, HIGH email **within 20s**. *This is the moment that sells it.*
 - [ ] 6 · **C** — 21-day range: idle-vs-working bars, fuel saw-tooth, temp threshold line
 - [ ] 7 · **D** — `/admin/forecast` — 8-week demand, interval band, MASE badge, recommendation sentences
-- [~] 8 · **B** — scan the same QR again → routed to `CHECK_IN` → total computed, machine `AVAILABLE`, receipt · *scan API done (B6), incl. totalAmount and receipt; needs B9*
+- [x] 8 · **B** — scan the same QR again → routed to `CHECK_IN` → total computed, machine `AVAILABLE`, receipt · *B9's receipt panel shows billable days, engine hours used and the total*
 
 **Have the `.sql` snapshot ready to restore in 30 seconds. Live demos break.**
 
@@ -405,6 +439,7 @@ bun run test:api:b4     # B4  — booking create, overlap rule, role scoping    
 bun run test:api:b5     # B5  — confirm, QR issuance, qr.png                      32
 bun run test:api:b6     # B6  — scan state machine, double-fire guard             44
 bun run test:api:b7     # B7  — response shapes the client booking pages read     40
+bun run test:api:b8     # B8/B9 — shapes the three ADMIN pages read             111
 ```
 
 **`with-test-db` also forces `MAIL_MODE=console`.** `MAIL_MODE` is `resend` with a live

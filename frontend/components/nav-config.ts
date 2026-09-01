@@ -16,6 +16,8 @@ export const NAV: Record<Role, NavItem[]> = {
   ],
   ADMIN: [
     { href: "/admin", label: "Fleet overview", owner: "C11" },
+    // A7 is the equipment API; the admin table/drawer on top of it had no task
+    // of its own in checklist.md and was built alongside B8/B9.
     { href: "/admin/equipment", label: "Equipment", owner: "A7" },
     { href: "/admin/bookings", label: "Bookings", owner: "B8" },
     { href: "/admin/scanner", label: "Scanner", owner: "B9" },

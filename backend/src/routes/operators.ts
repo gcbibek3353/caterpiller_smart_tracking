@@ -5,7 +5,7 @@ import { forbidden, notFound, ok } from "../lib/http";
 import { paginated } from "../lib/serialize";
 import { requireAuth } from "../middleware/auth";
 import { validate, valid } from "../middleware/validate";
-import { CreateOperatorInput, IdParam, Pagination, UpdateOperatorInput } from "../contracts";
+import { CreateOperatorInput, IdParam, OperatorListQuery, UpdateOperatorInput } from "../contracts";
 import type { AppEnv, SessionUser } from "../types";
 
 export const operatorRoutes = new Hono<AppEnv>();
@@ -20,10 +20,12 @@ const assertOwns = (user: SessionUser, clientId: string) => {
   }
 };
 
-operatorRoutes.get("/", validate("query", Pagination), async (c) => {
-  const { page, limit } = valid(c, "query", Pagination);
+operatorRoutes.get("/", validate("query", OperatorListQuery), async (c) => {
+  const { page, limit, clientId } = valid(c, "query", OperatorListQuery);
   const user = c.get("user");
-  const where: Prisma.OperatorWhereInput = user.role === "ADMIN" ? {} : { clientId: user.id };
+  // `?clientId=` is an ADMIN affordance only; a CLIENT stays pinned to their own.
+  const where: Prisma.OperatorWhereInput =
+    user.role === "ADMIN" ? (clientId ? { clientId } : {}) : { clientId: user.id };
 
   const [items, total] = await Promise.all([
     prisma.operator.findMany({

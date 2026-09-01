@@ -11,6 +11,8 @@ import { StatusPill } from "@/components/ui/status";
 type BookingRow = Booking & {
   equipment: Pick<Equipment, "id" | "code" | "name" | "type"> | null;
   site: { id: string; name: string } | null;
+  /** Server-computed — see backend/src/lib/overdue.ts for the grace-day rule. */
+  isOverdue: boolean;
 };
 
 const FILTERS: { label: string; value: BookingStatus | "" }[] = [
@@ -83,7 +85,14 @@ export default function MyBookingsPage() {
       ) : (
         <div className="grid gap-3">
           {bookings.data.items.map((b) => {
-            const overdue = b.status === "CHECKED_OUT" && new Date(b.endDate) < new Date();
+            /**
+             * Read, not re-derived. `endDate` is midnight UTC of the last
+             * rental day and is inclusive, so "late" needs a grace day —
+             * `now > endDate` alone badges every active rental at 00:01 on the
+             * return morning. That rule lives in backend/src/lib/overdue.ts and
+             * arrives on the row, which also keeps this component pure.
+             */
+            const overdue = b.isOverdue;
             return (
               <Link key={b.id} href={`/bookings/${b.id}`} className="block">
                 <article className="rounded-plate border border-line bg-plate p-4 transition-colors hover:border-ink">

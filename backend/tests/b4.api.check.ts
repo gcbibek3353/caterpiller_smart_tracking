@@ -189,9 +189,21 @@ const c2 = await prisma.user.findUniqueOrThrow({ where: { email: "c2@b.com" } })
 const eq = await admin("/api/equipment", { method: "POST", body: JSON.stringify({
   code: "EXC-9001", name: "Excavator 9001", type: "EXCAVATOR", dailyRate: 450, homeLat: 27.7, homeLng: 85.3 }) });
 const eqId = eq.body?.data?.id;
+/**
+ * `clientId` is not decoration here. A site belongs to exactly one client, and
+ * PATCH /api/bookings/:id refuses one belonging to anybody else — so a site
+ * created by the admin WITHOUT this field is owned by the admin and cannot be
+ * dispatched to c1's booking. Left off, this fixture only ever passed because
+ * nothing checked ownership.
+ */
 const site = await admin("/api/sites", { method: "POST", body: JSON.stringify({
-  name: "Site A", lat: 27.7, lng: 85.3, radiusMeters: 500 }) });
+  name: "Site A", lat: 27.7, lng: 85.3, radiusMeters: 500, clientId: c1.id }) });
 const siteId = site.body?.data?.id;
+
+// c2's site, kept for the cross-client assignment check further down.
+const foreignSite = await admin("/api/sites", { method: "POST", body: JSON.stringify({
+  name: "Site B", lat: 27.8, lng: 85.4, radiusMeters: 500, clientId: c2.id }) });
+const foreignSiteId = foreignSite.body?.data?.id;
 
 const book = (cl: ReturnType<typeof mkClient>, from: string, to: string, extra: object = {}) =>
   cl("/api/bookings", { method: "POST", body: JSON.stringify({
@@ -276,6 +288,10 @@ check("admin can read any booking", r.status === 200, `got ${r.status}`);
 console.log("\n── PATCH /api/bookings/:id ──");
 r = await admin(`/api/bookings/${bookingId}`, { method: "PATCH", body: JSON.stringify({ siteId }) });
 check("admin assigns a site", r.status === 200 && r.body?.data?.siteId === siteId, JSON.stringify(r.body?.error));
+r = await admin(`/api/bookings/${bookingId}`, { method: "PATCH", body: JSON.stringify({ siteId: foreignSiteId }) });
+check("admin assigning ANOTHER client's site → 400", r.status === 400, `got ${r.status}`);
+r = await admin(`/api/bookings/${bookingId}`);
+check("  and the original site is untouched", r.body?.data?.siteId === siteId, String(r.body?.data?.siteId));
 r = await client(`/api/bookings/${bookingId}`, { method: "PATCH", body: JSON.stringify({ siteId: null }) });
 check("client cannot reassign a site → 400", r.status === 400, `got ${r.status}`);
 r = await client(`/api/bookings/${bookingId}`, { method: "PATCH", body: JSON.stringify({ endDate: "2026-09-28T00:00:00Z" }) });

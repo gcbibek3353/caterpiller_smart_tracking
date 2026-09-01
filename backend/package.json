@@ -21,6 +21,7 @@
     "test:api:b5": "bun scripts/with-test-db.ts bun tests/b5.api.check.ts",
     "test:api:b6": "bun scripts/with-test-db.ts bun tests/b6.api.check.ts",
     "test:api:b7": "bun scripts/with-test-db.ts bun tests/b7.contract.check.ts",
+    "test:api:b8": "bun scripts/with-test-db.ts bun tests/b8.contract.check.ts",
     "test:api:seed": "bun scripts/with-test-db.ts bun prisma/seed.ts",
     "db:dump": "bun scripts/db-snapshot.ts dump",
     "db:restore": "bun scripts/db-snapshot.ts restore",
