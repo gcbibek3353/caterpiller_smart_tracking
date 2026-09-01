@@ -33,7 +33,7 @@
 | **B** | **B5/B6 — confirm, QR, scan** | ✅ `requireRole("ADMIN")` and `ScanCommitInput` ready (still stub `sendMail()` until D4) |
 | **C** | **C4 — Ingest + rollup** | ✅ `requireApiKey` + `IngestInput` (accepts bare array *or* `{ticks:[]}`) ready |
 | **D** | **D4 — Mailer** | ✅ `Notification` model live |
-| **A** | A7 — Equipment/Site/Operator CRUD | Next on A's list |
+| **A** | A8 — **the seed script** | Next on A's list; nothing blocks it |
 
 ## 🚧 Blocked right now
 
@@ -73,8 +73,17 @@ import type { AppEnv, SessionUser } from "../types";
 const app = new Hono<AppEnv>();     // gives you c.get("user") typed
 ```
 
-**Auth endpoints live:** `POST /api/auth/sign-up/email`, `POST /api/auth/sign-in/email`,
-`POST /api/auth/sign-out`, `GET /api/auth/me`.
+**Endpoints live now:**
+`POST /api/auth/sign-up/email` · `POST /api/auth/sign-in/email` · `POST /api/auth/sign-out` · `GET /api/auth/me`
+`GET|POST /api/equipment` · `GET|PATCH|DELETE /api/equipment/:id` (DELETE = soft delete → `RETIRED`)
+`GET|POST /api/sites` · `GET|PATCH|DELETE /api/sites/:id`
+`GET|POST /api/operators` · `GET|PATCH|DELETE /api/operators/:id`
+
+**Two serialization traps already handled for you** (`src/lib/serialize.ts`, imported in `index.ts`):
+`BigInt.prototype.toJSON` is patched — without it, returning a `Telemetry` row throws
+"Do not know how to serialize a BigInt". And Prisma `Decimal` is converted to a **number**,
+not the string Prisma gives you (`"450" * 2 === NaN` on the frontend). Use
+`serializeEquipment()` / `serializeBooking()` / `num()` on anything with money in it.
 Browser calls need `credentials: "include"`; state-changing calls need an `Origin` header
 (better-auth rejects `MISSING_OR_NULL_ORIGIN` — this bites curl, never a browser).
 New signups are **always CLIENT** — `role` is `input: false`, so it can't be set from the client.
@@ -113,7 +122,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **A4** · H2.5–H3 — Contracts · *`backend/src/contracts/` — 10 files, zod schema for every endpoint in §3. Enums use `z.nativeEnum` off the generated Prisma client, so a schema change is a compile error here. Import from `../contracts`.*
 - [x] **A5** · H3–H4 — better-auth · *mounted at `/api/auth/*`. Guards in `src/middleware/auth.ts`: `requireAuth`, `optionalAuth`, `requireRole(...)`, `requireApiKey`, `assertCanSeeEquipment`, `assertCanSeeBooking`. Verified end-to-end: signup, signin, signout deletes the session row, stale cookie 401s, untrusted origin rejected, `role` escalation at signup blocked.*
 - [x] **A6** · H4–H4.5 — Hono hardening · *CORS `credentials:true`, error envelope (Zod + Prisma P2002/P2025), `/health`, and `validate()` / `valid()` in `src/middleware/validate.ts`.*
-- [ ] **A7** · H4.5–H5.5 — Equipment / Site / Operator CRUD + availability date-overlap filter
+- [x] **A7** · H4.5–H5.5 — Equipment / Site / Operator CRUD · *`/api/equipment`, `/api/sites`, `/api/operators`. Availability overlap + soft delete + cross-client isolation. **28 API tests pass** — `bun run test:api`.*
 - [ ] **A8** · H5.5–H9 — **`prisma/seed.ts`** — highest-leverage file in the repo. 1 admin + 5 clients (create via better-auth signup so hashing matches), ~40 machines lopsided mix, sites + operators, ~600 bookings with trend + annual seasonality + weekday effects, `DailyUsage` 12 months, raw `Telemetry` **last 21 days only**. Under 90s, re-runnable. **Then `pg_dump` and commit the `.sql`.**
 - [ ] **A9** · H9–H9.5 — Swap in C's real rollup for the last 21 days ⛔ *needs C4; skip if late*
 - [ ] **A10** · H9.5–H11 — Frontend shell + auth pages, `authClient`, protected-route wrapper, typed `apiFetch()` with `credentials:'include'`
@@ -130,7 +139,13 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [ ] **B1** · H0–H0.75 — Contract workshop
 - [ ] **B2** · H0.75–H2 — **QR camera spike. DO THIS FIRST.** ⛔ *no deps* — `qr-scanner` (nimiq), `next dev --experimental-https`, **open it on a real phone over LAN right now.** `@zxing/browser` is the fallback.
 - [ ] **B3** · H2–H3 — Booking UI on fixtures ⛔ *no deps* — browse/filter + booking form against `frontend/fixtures/*.json`
-- [ ] **B4** · H3–H5 — Booking API: `POST /api/bookings` with **overlap validation** (this is where bugs hide), `GET` role-scoped, `GET`/`PATCH /:id` ⛔ *needs A3 ✅ + A4*
+- [ ] **B4** · H3–H5 — Booking API: `POST /api/bookings` with **overlap validation**, `GET` role-scoped, `GET`/`PATCH /:id` ⛔ *needs A3 ✅ + A4 ✅ — **unblocked***
+  > 📐 **The overlap rule is already written and tested** in `GET /api/equipment?availableFrom=&availableTo=`
+  > (`src/routes/equipment.ts`). Reuse it, don't re-derive it:
+  > blocking statuses are `PENDING | CONFIRMED | CHECKED_OUT`; bounds are **inclusive**
+  > (`startDate <= to && endDate >= from`), so a booking ending the 10th collides with one
+  > starting the 10th. `bun run test:api` has 6 boundary cases pinning this down — if you
+  > change the rule, run them.
 - [ ] **B5** · H5–H6.5 — Confirm + QR issuance: `qrToken = base64url(random 32B)`, opaque in DB, `GET /:id/qr.png`, payload `RENT:v1:<token>` and nothing else ⛔ *needs A5* — **stub `sendMail()` if D4 is late**
 - [ ] **B6** · H6–H8 — Scan state machine: `/api/scan/resolve` (preview) + `/api/scan/commit`. Wrap commit in `$transaction` and **re-read `booking.status` inside it** so a double-tap can't double-fire. Server decides check-out vs check-in from status, never the client.
 - [ ] **B7** · H8–H10 — Client UI live: browse → book → bookings list → QR page (render it **big**)

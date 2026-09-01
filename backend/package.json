@@ -11,7 +11,8 @@
     "db:reset": "prisma db push --force-reset",
     "db:studio": "prisma studio",
     "generate": "prisma generate",
-    "seed": "bun prisma/seed.ts"
+    "seed": "bun prisma/seed.ts",
+    "test:api": "bun tests/a7.api.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
