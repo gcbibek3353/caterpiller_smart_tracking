@@ -22,7 +22,7 @@
 
 | Who | Task | Why it's unblocked |
 |---|---|---|
-| **B** | **B2 — QR camera spike** | Zero deps. **Do this first, this hour.** A camera blocked at H20 kills the demo. |
+| **B** | B2 — QR camera spike | 🔨 *Page built & merged — **only the real-phone HTTPS test is left.** Until that runs, the H20 risk is not actually retired.* |
 | **B** | B3 — booking UI on fixtures | Zero deps; build against JSON fixtures |
 | **C** | C2 — simulator physics (pure fn → stdout) | Zero deps, no DB, no HTTP |
 | **C** | C3 — chart components on fixtures | Zero deps |
@@ -34,13 +34,15 @@
 | **C** | **C4 — Ingest + rollup** | ✅ `requireApiKey` + `IngestInput` (accepts bare array *or* `{ticks:[]}`) ready |
 | **D** | **D4 — Mailer** | ✅ `Notification` model live · **done, real send verified** |
 | **B** | B5 confirm + QR email | ✅ `sendMail()` is real now — import `services/mailer/service.ts`, no need to stub |
-| **A** | A7 — Equipment/Site/Operator CRUD | Next on A's list |
+| **C** | **C7 — asset page charts** | ✅ **Seeded data exists** — 54k ticks, 21 days, real fuel saw-tooth |
+| **D** | **D5 — detector runner** | ✅ Seeded data has **4 real injected faults** to fire on — done, see below |
+| **D** | **D6 — forecast runner** | ✅ 12 months of demand with trend + seasonality to learn — done, see below |
+| **A** | A10 — frontend shell + auth pages | A9 needs C4 first — next on A's list |
 
 ## 🚧 Blocked right now
 
 | Task | Waiting on |
 |---|---|
-| C7 asset page charts | A8 (seeded data) |
 | A9 real rollup in seed | C4 (rollup service) |
 | B10 phone scanner re-test | A11 (deploy) |
 | C12 asset timeline | ✅ unblocked — D5 anomalies exist now |
@@ -74,11 +76,50 @@ import type { AppEnv, SessionUser } from "../types";
 const app = new Hono<AppEnv>();     // gives you c.get("user") typed
 ```
 
-**Auth endpoints live:** `POST /api/auth/sign-up/email`, `POST /api/auth/sign-in/email`,
-`POST /api/auth/sign-out`, `GET /api/auth/me`.
+**Endpoints live now:**
+`POST /api/auth/sign-up/email` · `POST /api/auth/sign-in/email` · `POST /api/auth/sign-out` · `GET /api/auth/me`
+`GET|POST /api/equipment` · `GET|PATCH|DELETE /api/equipment/:id` (DELETE = soft delete → `RETIRED`)
+`GET|POST /api/sites` · `GET|PATCH|DELETE /api/sites/:id`
+`GET|POST /api/operators` · `GET|PATCH|DELETE /api/operators/:id`
+
+**Two serialization traps already handled for you** (`src/lib/serialize.ts`, imported in `index.ts`):
+`BigInt.prototype.toJSON` is patched — without it, returning a `Telemetry` row throws
+"Do not know how to serialize a BigInt". And Prisma `Decimal` is converted to a **number**,
+not the string Prisma gives you (`"450" * 2 === NaN` on the frontend). Use
+`serializeEquipment()` / `serializeBooking()` / `num()` on anything with money in it.
 Browser calls need `credentials: "include"`; state-changing calls need an `Origin` header
 (better-auth rejects `MISSING_OR_NULL_ORIGIN` — this bites curl, never a browser).
 New signups are **always CLIENT** — `role` is `input: false`, so it can't be set from the client.
+
+---
+
+## 🌱 The seeded database — what's in it for you
+
+```bash
+cd backend && bun run seed        # ~12s, wipes and rebuilds. Re-run whenever.
+bun run seed:verify               # asserts the data still has real structure
+bun run db:restore                # restore prisma/snapshot.sql in ~1s (demo parachute)
+```
+
+Logins: `admin@rental.com / admin123` · `client@build.com / client123`
+
+| For | What's there |
+|---|---|
+| **C** (asset page) | 54k ticks at 10-min resolution over the **last 21 days**. Fuel saw-tooths with real refuels, temp tracks engine state (OFF 28 °C · IDLE 66 °C · WORKING 82 °C). ~17 machines `CHECKED_OUT` right now. |
+| **D** (forecast) | 639 bookings over 12 months carrying **trend +15%/yr**, an annual cycle with a **~40% monsoon trough** (peak/trough 3.6×), weekday effects (Mon 165 starts vs Sun 12), and a type-mix shift. **GRADER peaks at 88% utilisation** in road season (→ shortage recommendation) while **LOADER sits at 56%** (→ surplus). Weekly peaks hit 100%. |
+| **D** (anomalies) | **Four faults deliberately injected** so your detectors find real signals: `BLD-0003` overheats to 115 °C · `EXC-0012` idles all day for 5 days · `LDR-0001` 4 days zero runtime · `CRN-0003` fuel siphon. Plus 52 bookings with **no operator** and 39 late returns. |
+| **B** (bookings) | 639 bookings across all 5 statuses. **No machine is ever double-booked** — asserted in `seed:verify`. |
+
+⚠️ **`bun run test:api` truncates the database.** Run it *before* seeding, or re-seed after.
+
+### 📐 One semantic D needs to decide
+`endDate` is stored at **midnight UTC of the last rental day**, and the availability
+rule treats it as **inclusive** (a booking ending the 10th blocks a booking starting
+the 10th). So the naive `OVERDUE` rule `now > endDate` fires at 00:01 on the return
+day, before the machine could possibly be back. **Use `now > endDate + 1 day`** — or
+the demo shows every active rental as overdue. The seed follows the inclusive reading:
+on-time returns land in business hours *of* `endDate`; the 39 genuinely-late ones are
+a calendar day or more past it.
 
 ---
 
@@ -114,8 +155,8 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **A4** · H2.5–H3 — Contracts · *`backend/src/contracts/` — 10 files, zod schema for every endpoint in §3. Enums use `z.nativeEnum` off the generated Prisma client, so a schema change is a compile error here. Import from `../contracts`.*
 - [x] **A5** · H3–H4 — better-auth · *mounted at `/api/auth/*`. Guards in `src/middleware/auth.ts`: `requireAuth`, `optionalAuth`, `requireRole(...)`, `requireApiKey`, `assertCanSeeEquipment`, `assertCanSeeBooking`. Verified end-to-end: signup, signin, signout deletes the session row, stale cookie 401s, untrusted origin rejected, `role` escalation at signup blocked.*
 - [x] **A6** · H4–H4.5 — Hono hardening · *CORS `credentials:true`, error envelope (Zod + Prisma P2002/P2025), `/health`, and `validate()` / `valid()` in `src/middleware/validate.ts`.*
-- [ ] **A7** · H4.5–H5.5 — Equipment / Site / Operator CRUD + availability date-overlap filter
-- [ ] **A8** · H5.5–H9 — **`prisma/seed.ts`** — highest-leverage file in the repo. 1 admin + 5 clients (create via better-auth signup so hashing matches), ~40 machines lopsided mix, sites + operators, ~600 bookings with trend + annual seasonality + weekday effects, `DailyUsage` 12 months, raw `Telemetry` **last 21 days only**. Under 90s, re-runnable. **Then `pg_dump` and commit the `.sql`.**
+- [x] **A7** · H4.5–H5.5 — Equipment / Site / Operator CRUD · *`/api/equipment`, `/api/sites`, `/api/operators`. Availability overlap + soft delete + cross-client isolation. **28 API tests pass** — `bun run test:api`.*
+- [x] **A8** · H5.5–H9 — **`prisma/seed.ts`** · ***12.3s** (budget was 90s). 6 users, 40 machines, 639 bookings, 54k ticks, 7.7k DailyUsage, 1.1k check events. **Re-runnable and deterministic** — 3 consecutive runs give byte-identical data. Snapshot committed at `prisma/snapshot.sql` (9.4 MB, restores in 1.1s). 13 structure assertions pass via `bun run seed:verify`.*
 - [ ] **A9** · H9–H9.5 — Swap in C's real rollup for the last 21 days ⛔ *needs C4; skip if late*
 - [ ] **A10** · H9.5–H11 — Frontend shell + auth pages, `authClient`, protected-route wrapper, typed `apiFetch()` with `credentials:'include'`
 - [ ] **A11** · H11–H13 — **Deploy** (budget the full 2h — the cross-origin session cookie is the trap)
@@ -129,9 +170,15 @@ truth — `backend/src/contracts/` wins any disagreement.
 # Person B — Bookings, QR & Booking UX
 
 - [ ] **B1** · H0–H0.75 — Contract workshop
-- [ ] **B2** · H0.75–H2 — **QR camera spike. DO THIS FIRST.** ⛔ *no deps* — `qr-scanner` (nimiq), `next dev --experimental-https`, **open it on a real phone over LAN right now.** `@zxing/browser` is the fallback.
+- [~] **B2** · H0.75–H2 — **QR camera spike** · *B — code merged to `main` (`b4696f4`): `frontend/app/spike/scan/page.tsx`. `qr-scanner` (nimiq) decoding, **manual code-entry input beside the camera from day one**, secure-context banner that shows `isSecureContext`/`mediaDevices` so a blocked camera can't be mistaken for a permissions bug, and a commented-out `@zxing/browser` fallback with the swap note inline. `bun run build` + `lint` clean; page prerenders (scanner is dynamic-imported, so SSR is safe).* **⚠️ Still missing: the phone test over LAN HTTPS — which is the entire point of B2.** Command + the `-H` gotcha are in *Environment quick start*. **Teammates: `bun install` in `frontend/` — two new deps.**
 - [ ] **B3** · H2–H3 — Booking UI on fixtures ⛔ *no deps* — browse/filter + booking form against `frontend/fixtures/*.json`
-- [ ] **B4** · H3–H5 — Booking API: `POST /api/bookings` with **overlap validation** (this is where bugs hide), `GET` role-scoped, `GET`/`PATCH /:id` ⛔ *needs A3 ✅ + A4*
+- [ ] **B4** · H3–H5 — Booking API: `POST /api/bookings` with **overlap validation**, `GET` role-scoped, `GET`/`PATCH /:id` ⛔ *needs A3 ✅ + A4 ✅ — **unblocked***
+  > 📐 **The overlap rule is already written and tested** in `GET /api/equipment?availableFrom=&availableTo=`
+  > (`src/routes/equipment.ts`). Reuse it, don't re-derive it:
+  > blocking statuses are `PENDING | CONFIRMED | CHECKED_OUT`; bounds are **inclusive**
+  > (`startDate <= to && endDate >= from`), so a booking ending the 10th collides with one
+  > starting the 10th. `bun run test:api` has 6 boundary cases pinning this down — if you
+  > change the rule, run them.
 - [ ] **B5** · H5–H6.5 — Confirm + QR issuance: `qrToken = base64url(random 32B)`, opaque in DB, `GET /:id/qr.png`, payload `RENT:v1:<token>` and nothing else ⛔ *needs A5* — **stub `sendMail()` if D4 is late**
 - [ ] **B6** · H6–H8 — Scan state machine: `/api/scan/resolve` (preview) + `/api/scan/commit`. Wrap commit in `$transaction` and **re-read `booking.status` inside it** so a double-tap can't double-fire. Server decides check-out vs check-in from status, never the client.
 - [ ] **B7** · H8–H10 — Client UI live: browse → book → bookings list → QR page (render it **big**)
@@ -186,7 +233,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 
 - [~] **H0.75** — Schema + endpoint contract signed off · *schema ✅ · decision table drafted, awaiting B/C/D sign-off*
 - [x] **H2.5** — A pushes `schema.prisma`, `prisma generate` works → unblocks B4, C4, D4
-- [ ] **H9** — Seeded DB exists, everyone pulls → unblocks C7, D5, D6
+- [x] **H9** — **Seeded DB exists** → C7, D5, D6 are unblocked. `cd backend && bun run seed` (12s).
 - [ ] **H18** — **Feature freeze** → integration only
 
 ## Never cut
@@ -229,3 +276,22 @@ cd ../frontend && bun install && bun run dev   # :3000
 
 ⚠️ **Postgres is on 5433, not 5432** — `steps.md` §1 says 5432; that port is taken on the
 dev machine. Use the `DATABASE_URL` in `backend/.env.example`.
+
+### Scanner over LAN HTTPS — needed for B2, B9, B10
+
+```bash
+cd frontend
+bun dev --experimental-https -H <your-LAN-IP>   # e.g. 172.20.196.17 — find it with: ipconfig getifaddr en0
+# then on the phone: https://<your-LAN-IP>:3000/spike/scan
+```
+
+⚠️ **The `-H` flag is not optional.** Next only puts `localhost, 127.0.0.1, ::1` in the
+generated cert unless you pass a hostname (`next/dist/lib/mkcert.js` → `createSelfSignedCertificate`),
+so plain `--experimental-https` yields a cert the phone rejects outright. Two more things:
+first run downloads mkcert and **prompts for your Mac password** (`mkcert -install`); and the
+phone will *still* show a cert warning, because that CA is trusted on the Mac only — tap
+through, bypassing still gives a secure context so the camera works. If iOS Safari refuses,
+`cloudflared tunnel --url https://localhost:3000` gives a genuinely trusted cert.
+
+`http://192.168.x.x:3000` will **never** work — `navigator.mediaDevices` is `undefined`
+outside a secure context. The banner on `/spike/scan` tells you which side of that line you're on.

@@ -4,8 +4,12 @@ import { logger } from "hono/logger";
 import { env } from "./env";
 import { prisma } from "./db";
 import { ok } from "./lib/http";
+import "./lib/serialize"; // installs the BigInt JSON patch
 import { onError, onNotFound } from "./middleware/error";
 import { authRoutes } from "./routes/auth";
+import { equipmentRoutes } from "./routes/equipment";
+import { siteRoutes } from "./routes/sites";
+import { operatorRoutes } from "./routes/operators";
 import { anomalyRoutes } from "./routes/anomalies";
 import { forecastRoutes } from "./routes/forecast";
 import { startScheduler } from "./jobs/scheduler";
@@ -50,7 +54,9 @@ app.get("/health", async (c) => {
 
 // ── Route modules mount here as each owner lands them ──
 app.route("/api/auth", authRoutes); // A5 ✅
-// app.route("/api/equipment", equipmentRoutes);  // A7
+app.route("/api/equipment", equipmentRoutes); // A7 ✅
+app.route("/api/sites", siteRoutes); // A7 ✅
+app.route("/api/operators", operatorRoutes); // A7 ✅
 // app.route("/api/bookings",  bookingRoutes);    // B4
 // app.route("/api/scan",      scanRoutes);       // B6
 // app.route("/api/telemetry", telemetryRoutes);  // C4

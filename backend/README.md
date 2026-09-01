@@ -38,7 +38,12 @@ The compose project is named `rental` so it can't collide with the unrelated
 | `bun run db:push` | push `schema.prisma` (no migrations — 24h build) |
 | `bun run db:reset` | **drops all data** and re-pushes |
 | `bun run db:studio` | Prisma Studio |
-| `bun run seed` | seed script (A8 — not written yet) |
+| `bun run seed` | **wipe + reseed 12 months of history (~12s). Safe to re-run any time.** |
+| `bun run seed:fresh` | `db push --force-reset` then seed — use after a schema change |
+| `bun run seed:verify` | assert the seeded data still has real seasonality + faults (read-only) |
+| `bun run db:dump` | write `prisma/snapshot.sql` — the demo-day parachute |
+| `bun run db:restore` | restore that snapshot (~1s) |
+| `bun run test:api` | A7 API tests — ⚠️ **destructive, wipes the seed**; re-seed after |
 
 ## Conventions
 
@@ -65,3 +70,35 @@ src/
 ├── services/      rollup, forecast, anomaly, mailer
 └── jobs/          scheduler
 ```
+
+
+## The seed
+
+`bun run seed` — ~12s, and **re-runnable as many times as you like**. It TRUNCATEs
+every domain table first, and the PRNG is fixed-seed, so three consecutive runs
+produce byte-identical data. The demo looks the same every rehearsal, and any bug
+is reproducible.
+
+What it builds:
+
+| | |
+|---|---|
+| 6 users | `admin@rental.com / admin123` · `client@build.com / client123` (+4 more clients) |
+| 40 machines | deliberately lopsided: 12 excavators … 2 forklifts |
+| 639 bookings | 12 months back + 4 weeks forward |
+| 54k telemetry ticks | 10-minute resolution, last 21 days only |
+| 7.7k DailyUsage rows | last 21 days **derived from the real ticks**, older days synthesised |
+| 1.1k check events | so the asset timeline has content |
+
+The demand curve is not noise — it carries **trend** (+15%/yr), **annual seasonality**
+(peak in the dry season, a ~40% monsoon trough), **weekday effects** (Mon 165 starts
+vs Sun 12), and a **type-mix shift** (graders spike in road season, reaching 88%
+utilisation while loaders sit at 56%). That contrast is what makes the forecast's
+shortage/surplus recommendations say something real.
+
+Four faults are injected into the recent window so the anomaly detectors find
+**genuinely detected** anomalies rather than fixture rows: overheat (115 °C),
+a machine idling all day, 4 days of zero runtime, and a fuel siphon.
+
+**Tune it in `prisma/seed/config.ts`** — every number lives there. Then run
+`bun run seed:verify` to confirm you didn't flatten the curve.
