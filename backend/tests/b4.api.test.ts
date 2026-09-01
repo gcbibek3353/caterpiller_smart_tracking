@@ -252,6 +252,24 @@ check("owner can cancel their own → 200", r.status === 200, JSON.stringify(r.b
 r = await client(`/api/bookings/${bookingId}`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) });
 check("cancelling twice → 409", r.status === 409, `got ${r.status}`);
 
+console.log("\n── cancel is refused once the machine is physically out ──");
+/**
+ * steps.md §5 draws a cancel arrow from CHECKED_OUT, but honouring it would
+ * strand Equipment.status at CHECKED_OUT with no booking left to check in
+ * against. The route refuses it and points at the check-in scan instead.
+ * This asserts that deliberate narrowing so it cannot be relaxed by accident.
+ */
+const outBooking = await book(client, "2027-06-01", "2027-06-10");
+const outId = outBooking.body?.data?.id;
+await prisma.booking.update({ where: { id: outId }, data: { status: "CHECKED_OUT" } });
+r = await client(`/api/bookings/${outId}`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) });
+check("CHECKED_OUT booking cannot be cancelled → 409", r.status === 409, `got ${r.status}`);
+check("  message points at check-in", /check the machine back in/i.test(r.body?.error?.message ?? ""), JSON.stringify(r.body?.error));
+r = await admin(`/api/bookings/${outId}`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) });
+check("  and ADMIN cannot force it either → 409", r.status === 409, `got ${r.status}`);
+const stillOut = await prisma.booking.findUniqueOrThrow({ where: { id: outId } });
+check("  booking is still CHECKED_OUT in the DB", stillOut.status === "CHECKED_OUT", stillOut.status);
+
 console.log("\n── concurrency: the same window, twice at once ──");
 const raceEq = await admin("/api/equipment", { method: "POST", body: JSON.stringify({
   code: "EXC-9002", name: "Race", type: "EXCAVATOR", dailyRate: 400, homeLat: 27.7, homeLng: 85.3 }) });

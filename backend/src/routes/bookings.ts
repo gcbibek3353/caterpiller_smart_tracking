@@ -59,13 +59,21 @@ const newQrToken = () => randomBytes(32).toString("base64url");
 
 /**
  * `code` is `@unique` and has no default, so it must be generated here.
- * Sequence is derived per-year; a collision under concurrency surfaces as P2002
- * and is retried by `createWithRetry` with a freshly counted sequence.
+ *
+ * Takes the transaction client so the count runs on the SAME connection as the
+ * insert. Using the global `prisma` here instead would borrow a second pooled
+ * connection while the transaction still holds the first, which deadlocks once
+ * the pool is busy — and the count would not see the transaction's own writes.
+ *
+ * The read widens what Serializable tracks to every booking created this year,
+ * so a concurrent insert on unrelated equipment can abort this transaction with
+ * P2034. That is what the retry loop in the handler absorbs; the retry recounts
+ * and gets a fresh sequence.
  */
-async function nextBookingCode(): Promise<string> {
+async function nextBookingCode(tx: Prisma.TransactionClient): Promise<string> {
   const year = new Date().getUTCFullYear();
   const startOfYear = new Date(Date.UTC(year, 0, 1));
-  const count = await prisma.booking.count({ where: { createdAt: { gte: startOfYear } } });
+  const count = await tx.booking.count({ where: { createdAt: { gte: startOfYear } } });
   return `BK-${year}-${String(count + 1).padStart(6, "0")}`;
 }
 
@@ -110,14 +118,8 @@ bookingRoutes.post("/", validate("json", CreateBookingInput), async (c) => {
    * A DB-level exclusion constraint would be stronger, but that needs a schema
    * change and only A edits schema.prisma.
    */
-  const attempt = async () => {
-    // Generated OUTSIDE the transaction: calling the global client from inside
-    // an interactive transaction borrows a second pooled connection while the
-    // first is still held, which deadlocks once the pool is busy. A collision
-    // here is a P2002 and is retried below.
-    const code = await nextBookingCode();
-
-    return prisma.$transaction(
+  const attempt = async () =>
+    prisma.$transaction(
       async (tx) => {
         const clash = await tx.booking.findFirst({
           where: overlapWhere(body.equipmentId, body.startDate, body.endDate),
@@ -146,7 +148,9 @@ bookingRoutes.post("/", validate("json", CreateBookingInput), async (c) => {
 
         return tx.booking.create({
           data: {
-            code,
+            // Same `tx` client as the overlap read and the insert: one
+            // connection, one consistent snapshot.
+            code: await nextBookingCode(tx),
             equipmentId: body.equipmentId,
             clientId,
             siteId: body.siteId ?? null,
@@ -172,7 +176,6 @@ bookingRoutes.post("/", validate("json", CreateBookingInput), async (c) => {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
-  };
 
   let created;
   for (let i = 0; i < 3; i++) {
