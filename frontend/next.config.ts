@@ -23,6 +23,18 @@ const nextConfig: NextConfig = {
   devIndicators: { position: "bottom-right" },
 
   /**
+   * Fleet photographs come from Wikimedia Commons — see
+   * `backend/prisma/equipment-images.ts` for the catalogue and its licences.
+   * `next/image` refuses any remote host not listed here, so this and that file
+   * have to move together.
+   */
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "upload.wikimedia.org", pathname: "/wikipedia/commons/**" },
+    ],
+  },
+
+  /**
    * Same-origin `/api` proxy — OFF unless `API_PROXY_TARGET` is set.
    *
    * `bun run dev:https` sets it, because a phone on the LAN cannot use the
@@ -40,6 +52,19 @@ const nextConfig: NextConfig = {
    * Left off by default so `bun run dev` keeps talking to :4000 directly and
    * nobody's existing setup moves under them.
    */
+  /**
+   * `/asset/<id>` was C7's original route for this page. steps.md §11 and the
+   * demo running order both still name it, so it stays working — but as a real
+   * 308 from the routing layer rather than a stub page calling `redirect()`,
+   * which the App Router serves as a client-side RSC redirect (a 200 carrying a
+   * REDIRECT payload, so it needs JS and never updates a bookmark).
+   */
+  async redirects() {
+    return [
+      { source: "/asset/:equipmentId", destination: "/equipment/:equipmentId", permanent: true },
+    ];
+  },
+
   async rewrites() {
     const target = process.env.API_PROXY_TARGET;
     if (!target) return [];

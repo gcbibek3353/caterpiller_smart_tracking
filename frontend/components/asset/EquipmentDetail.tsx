@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   DateRangeControls,
   type BucketSize,
@@ -33,9 +33,16 @@ import type {
 /** Refuels aren't a stored flag — a jump upward between consecutive ticks is one. */
 const REFUEL_JUMP_PCT = 5;
 
-export default function AssetPage({ params }: PageProps<"/asset/[assetId]">) {
-  // Next 16: route params arrive as a promise.
-  const { assetId } = use(params);
+/**
+ * The equipment detail view — sections 1-6 of steps.md §11.
+ *
+ * Lives here rather than in a route file because two routes render it:
+ * `/equipment/[equipmentId]` (canonical) and `/asset/[assetId]`, which C7
+ * shipped and which the demo script still names. Keeping one implementation
+ * means the charts cannot drift apart between the two URLs.
+ */
+export function EquipmentDetail({ equipmentId }: { equipmentId: string }) {
+  const assetId = equipmentId;
 
   const [days, setDays] = useState<DateRangeDays>(7);
   const [bucket, setBucket] = useState<BucketSize>("1h");
@@ -81,7 +88,9 @@ export default function AssetPage({ params }: PageProps<"/asset/[assetId]">) {
 
   const loading = summary.loading || daily.loading;
 
-  const dailyRows = daily.data ?? [];
+  // Memoised, not `daily.data ?? []`: a fresh [] every render re-runs every
+  // useMemo below it, which is what the exhaustive-deps warning was about.
+  const dailyRows = useMemo(() => daily.data ?? [], [daily.data]);
 
   const workingIdle = useMemo(
     () =>

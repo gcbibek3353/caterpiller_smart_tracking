@@ -19,6 +19,7 @@ import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Dialog } from "@/components/ui/dialog";
 import { StatusPill } from "@/components/ui/status";
+import { EquipmentPhoto } from "@/components/equipment/EquipmentPhoto";
 
 const FILTERS: { label: string; value: BookingStatus | "" }[] = [
   { label: "All", value: "" },
@@ -270,10 +271,25 @@ function BookingsDesk() {
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-display text-title-sm font-semibold uppercase leading-none">
-                        {b.equipment?.name ?? "—"}
-                      </p>
-                      <p className="mt-1 font-mono text-data-sm text-mute">{b.equipment?.code ?? "—"}</p>
+                      <div className="flex items-start gap-3">
+                        {b.equipment ? (
+                          <Link href={`/equipment/${b.equipment.id}`} aria-label={`Open ${b.equipment.code}`}>
+                            <EquipmentPhoto
+                              src={b.equipment.imageUrl}
+                              alt={b.equipment.name}
+                              type={b.equipment.type}
+                              sizes="64px"
+                              className="h-11 w-16 shrink-0"
+                            />
+                          </Link>
+                        ) : null}
+                        <div className="min-w-0">
+                          <p className="font-display text-title-sm font-semibold uppercase leading-none">
+                            {b.equipment?.name ?? "—"}
+                          </p>
+                          <p className="mt-1 font-mono text-data-sm text-mute">{b.equipment?.code ?? "—"}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-body text-ink">{b.client?.companyName ?? b.client?.name ?? "—"}</p>

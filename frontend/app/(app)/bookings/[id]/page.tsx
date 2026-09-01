@@ -9,6 +9,7 @@ import type { Booking, Equipment } from "@/lib/types";
 import { Plate, PlateRow, PlateRows } from "@/components/ui/plate";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status";
+import { EquipmentPhoto } from "@/components/equipment/EquipmentPhoto";
 
 type BookingDetail = Booking & {
   equipment: Pick<Equipment, "id" | "code" | "name" | "type" | "imageUrl" | "status"> | null;
@@ -63,6 +64,17 @@ export default function BookingDetailPage() {
           <div className="grid gap-5 lg:grid-cols-[1fr_auto]">
             <div className="grid gap-5">
               <Plate title="Rental">
+                {booking.equipment ? (
+                  <Link href={`/equipment/${booking.equipment.id}`} className="mb-4 block">
+                    <EquipmentPhoto
+                      src={booking.equipment.imageUrl}
+                      alt={`${booking.equipment.code} — ${booking.equipment.name}`}
+                      type={booking.equipment.type}
+                      sizes="(max-width: 1024px) 100vw, 640px"
+                      className="aspect-[16/9] w-full"
+                    />
+                  </Link>
+                ) : null}
                 <PlateRows>
                   <PlateRow label="Machine" value={booking.equipment?.code ?? "—"} />
                   <PlateRow label="Type" value={(booking.equipment?.type ?? "—").replace(/_/g, " ")} />

@@ -145,7 +145,7 @@ export default function AdminAnomalies() {
                   </td>
                   <td className="px-4 py-3 font-mono text-stamp-lg">{a.type.replace(/_/g, " ")}</td>
                   <td className="px-4 py-3">
-                    <Link href={`/asset/${a.equipmentId}`} className="group flex flex-col leading-tight hover:text-hivis">
+                    <Link href={`/equipment/${a.equipmentId}`} className="group flex flex-col leading-tight hover:text-hivis">
                       <span className="font-mono text-stamp-lg text-ink group-hover:text-hivis">{a.equipmentCode}</span>
                       <span className="stamp text-stamp-xs text-mute">{a.equipmentType.replace(/_/g, " ")}</span>
                     </Link>

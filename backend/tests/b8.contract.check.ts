@@ -1,5 +1,6 @@
 /**
- * B8/B9 contract checks — the response shapes the three ADMIN pages read.
+ * B8/B9 contract checks — the response shapes the admin pages and the
+ * equipment detail page read.
  *
  *       bun run db:up
  *       bun run dev:test        # terminal 1
@@ -266,6 +267,90 @@ r = await admin("/api/bookings?limit=200");
 check("due earlier TODAY is not yet overdue (the grace day)", ((r.body?.data?.items ?? []).find((b: any) => b.id === odId))?.isOverdue === false, "still flagged late on the return day");
 r = await admin("/api/bookings?overdue=true");
 check("  and the filter agrees with the flag", !(r.body?.data?.items ?? []).some((b: any) => b.id === odId));
+
+console.log("\n── /bookings: the Upcoming returns tab ──");
+/**
+ * `odId` is already a CHECKED_OUT booking, so it can be walked through each
+ * case by moving only its endDate. Times are set to midday UTC to keep the
+ * whole-day arithmetic away from a midnight boundary.
+ */
+const atDay = (offset: number) => {
+  const d = new Date();
+  d.setUTCHours(12, 0, 0, 0);
+  return new Date(d.getTime() + offset * 86_400_000);
+};
+const setEnd = (offset: number) =>
+  prisma.booking.update({ where: { id: odId }, data: { status: "CHECKED_OUT", endDate: atDay(offset) } });
+const inReturns = async (days: number) => {
+  const res = await admin(`/api/bookings?returningWithinDays=${days}&limit=200`);
+  return { hit: (res.body?.data?.items ?? []).find((b: any) => b.id === odId), all: res.body?.data?.items ?? [] };
+};
+
+await setEnd(3);
+let g = await inReturns(7);
+check("a booking due in 3 days is in the 7-day window", g.hit != null);
+check("  daysUntilReturn is 3", g.hit?.daysUntilReturn === 3, JSON.stringify(g.hit?.daysUntilReturn));
+check("  every row in the tab is CHECKED_OUT", g.all.every((b: any) => b.status === "CHECKED_OUT"));
+check("  no row in the tab is overdue (the two sets are disjoint)", g.all.every((b: any) => b.isOverdue === false));
+const order = g.all.map((b: any) => b.daysUntilReturn);
+check("  sorted soonest-first", JSON.stringify(order) === JSON.stringify([...order].sort((a, b) => a - b)), JSON.stringify(order));
+
+await setEnd(0);
+g = await inReturns(7);
+check("due back TODAY still counts as upcoming, not late", g.hit != null && g.hit.isOverdue === false);
+check("  daysUntilReturn is 0", g.hit?.daysUntilReturn === 0, JSON.stringify(g.hit?.daysUntilReturn));
+
+await setEnd(30);
+check("due in 30 days is outside the 7-day window", (await inReturns(7)).hit == null);
+check("  but inside a 90-day one", (await inReturns(90)).hit != null);
+
+// The case the seeded data happens not to contain: a genuinely late rental.
+await setEnd(-3);
+g = await inReturns(90);
+check("an OVERDUE booking never appears under upcoming returns", g.hit == null);
+r = await admin("/api/bookings?overdue=true&limit=200");
+check("  it appears under overdue instead", (r.body?.data?.items ?? []).some((b: any) => b.id === odId));
+
+// A machine that never left the yard cannot be "returned".
+await prisma.booking.update({ where: { id: odId }, data: { status: "CONFIRMED", endDate: atDay(2) } });
+check("a CONFIRMED booking due in 2 days is NOT an upcoming return", (await inReturns(7)).hit == null);
+r = await admin(`/api/bookings?limit=200`);
+const confirmedRow = (r.body?.data?.items ?? []).find((b: any) => b.id === odId);
+check("  and daysUntilReturn is null while it is not out", confirmedRow?.daysUntilReturn === null, JSON.stringify(confirmedRow?.daysUntilReturn));
+
+r = await admin("/api/bookings?returningWithinDays=0");
+check("returningWithinDays=0 is rejected → 422", r.status === 422, `got ${r.status}`);
+
+// ══ /equipment/[equipmentId] — the detail page ══════════════════════
+console.log("\n── /equipment/[id]: photo + spec on the list row ──");
+r = await admin(`/api/equipment/${eqId}`);
+check("equipment detail → 200", r.status === 200, `got ${r.status}`);
+check("  imageUrl key present (cards and tables render it)", r.body?.data && "imageUrl" in r.body.data, JSON.stringify(Object.keys(r.body?.data ?? {})));
+
+console.log("\n── /equipment/[id]: the summary drives the whole header ──");
+r = await admin(`/api/equipment/${eqId}/summary`);
+check("summary → 200", r.status === 200, JSON.stringify(r.body?.error));
+d = r.body?.data;
+// The header used to need a second GET /api/equipment/:id just for these.
+for (const f of ["imageUrl", "make", "model", "year", "dailyRate", "hourlyRate", "fuelCapacityL", "meterHours", "homeLat", "homeLng", "notes"])
+  check(`  summary.${f} (header renders it)`, d && f in d, JSON.stringify(Object.keys(d ?? {})));
+check("  dailyRate is a NUMBER not a Decimal string (.toFixed)", typeof d?.dailyRate === "number", typeof d?.dailyRate);
+check("  meterHours is a NUMBER (.toFixed)", typeof d?.meterHours === "number", typeof d?.meterHours);
+for (const f of ["runtimeHours", "idleHours", "utilizationPct", "currentFuelPct", "currentEngineState", "sampleCount"])
+  check(`  summary.${f} (KPI row)`, d && f in d);
+
+console.log("\n── /equipment/[id]: the series the charts draw ──");
+for (const [metric, label] of [["fuel", "fuel area"], ["temp", "temperature line"], ["engineState", "engine-state ribbon"]]) {
+  r = await admin(`/api/equipment/${eqId}/timeseries?metric=${metric}&bucket=1h`);
+  check(`timeseries metric=${metric} → 200 (${label})`, r.status === 200, JSON.stringify(r.body?.error));
+  check(`  returns an array`, Array.isArray(r.body?.data), typeof r.body?.data);
+}
+r = await admin(`/api/equipment/${eqId}/daily`);
+check("daily → 200 (working/idle bars + usage line)", r.status === 200 && Array.isArray(r.body?.data), JSON.stringify(r.body?.error));
+r = await admin(`/api/equipment/${eqId}/track`);
+check("track → 200 (map breadcrumb)", r.status === 200 && Array.isArray(r.body?.data), JSON.stringify(r.body?.error));
+r = await admin(`/api/equipment/${eqId}/events`);
+check("events → 200 (timeline)", r.status === 200 && Array.isArray(r.body?.data), JSON.stringify(r.body?.error));
 
 console.log(`\n${fail === 0 ? "✅" : "❌"}  ${pass} passed, ${fail} failed`);
 await prisma.$disconnect();

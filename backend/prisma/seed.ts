@@ -19,6 +19,7 @@ import { metersToDegLat, metersToDegLng } from "../src/lib/geo";
 import * as C from "./seed/config";
 import { arrivalRate, drawDuration, makeSpikes } from "./seed/demand";
 import { generateTicks, rollupTicks, type DailyRow, type MachineState, type Tick } from "./seed/telemetry";
+import { photoFor } from "./equipment-images";
 
 const rng = new Rng(C.SEED);
 const t0 = Date.now();
@@ -98,8 +99,13 @@ async function seedEquipment() {
   for (const spec of Object.values(C.FLEET)) {
     for (let i = 1; i <= spec.count; i++) {
       const rate = rng.float(spec.dailyRate[0], spec.dailyRate[1]);
+      const code = `${spec.prefix}-${String(i).padStart(4, "0")}`;
       data.push({
-        code: `${spec.prefix}-${String(i).padStart(4, "0")}`,
+        code,
+        // Keyed on the code, not drawn from `rng` — a photo must not consume
+        // randomness, or adding images would shift every downstream draw and
+        // silently change the whole dataset the demo was tuned against.
+        imageUrl: photoFor(spec.type, code)?.url ?? null,
         name: `${rng.pick(MAKES)} ${spec.type.replace("_", " ").toLowerCase()}`,
         type: spec.type,
         make: rng.pick(MAKES),

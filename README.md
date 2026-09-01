@@ -202,8 +202,11 @@ bun run sim:theft
 | Variable | Purpose |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:4000` |
+| `API_PROXY_TARGET` | Unset by default. When set, `next.config.ts` rewrites `/api/*` to this origin, so the frontend only ever talks to itself. |
 
 > **Postgres runs on port 5433, not 5432.** Port 5432 is often taken on dev machines. Adminer: [http://localhost:8081](http://localhost:8081).
+
+> **A11's known trap, solved ahead of time:** on a phone over the LAN, an `https://<LAN-IP>` page cannot fetch `http://localhost:4000` (mixed content) or `http://<LAN-IP>:4000` (not in `CORS_ORIGIN`, and the session cookie goes cross-site). `bun run dev:https` sets `API_PROXY_TARGET` automatically, which collapses all three problems into a same-origin request — no mixed content, no CORS, no cross-site cookie. The same mechanism is the deploy escape hatch, not just the phone-test one.
 
 ---
 
@@ -309,7 +312,7 @@ Ingest is idempotent: `@@unique([equipmentId, ts])` + `createMany({ skipDuplicat
 | `/dashboard` | Client | Available equipment, own sites |
 | `/equipment` | Client | Browse and book |
 | `/bookings`, `/bookings/[id]` | Client | My rentals, QR display |
-| `/asset/[assetId]` | Both | Machine detail — KPIs, 5 charts, GPS map, event timeline. Accepts a real equipment id (what every in-app link uses) or a human-typed code as a fallback. |
+| `/equipment/[equipmentId]` | Both | Machine detail — KPIs, 5 charts, GPS map, event timeline, equipment photo. `/asset/:id` (the original C7 route, still named in `steps.md` §11 and the demo script below) is kept working as a real 308 redirect in `next.config.ts`, not a client-side stub — old bookmarks and links never break. |
 | `/alerts` | Both | Notification feed + anomaly feed, merged into one chronological timeline |
 | `/admin` | Admin | Fleet KPIs, status bar, needs-attention list, **forecast-risk bar** (utilization by type, next week), **anomaly trend** (stacked by severity, last 14 days) |
 | `/admin/equipment` | Admin | Fleet CRUD |

@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { TextArea } from "@/components/ui/textarea";
 import { Drawer } from "@/components/ui/dialog";
 import { StatusPill } from "@/components/ui/status";
+import { EquipmentPhoto } from "@/components/equipment/EquipmentPhoto";
 
 const TYPES: EquipmentType[] = [
   "EXCAVATOR", "CRANE", "BULLDOZER", "GRADER",
@@ -148,6 +149,7 @@ export default function AdminEquipmentPage() {
             <table className="w-full text-left text-body">
               <thead>
                 <tr className="stamp border-b border-line text-stamp-sm text-mute">
+                  <th className="px-4 py-3 w-px"><span className="sr-only">Photo</span></th>
                   <th className="px-4 py-3">Code</th>
                   <th className="px-4 py-3">Machine</th>
                   <th className="px-4 py-3">Type</th>
@@ -160,8 +162,19 @@ export default function AdminEquipmentPage() {
               <tbody>
                 {items.map((e) => (
                   <tr key={e.id} className="border-b border-line/60 align-top last:border-0">
+                    <td className="py-3 pl-4 pr-0">
+                      <Link href={`/equipment/${e.id}`} aria-label={`Open ${e.code}`}>
+                        <EquipmentPhoto
+                          src={e.imageUrl}
+                          alt={e.name}
+                          type={e.type}
+                          sizes="72px"
+                          className="h-12 w-[72px]"
+                        />
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 font-mono text-data">
-                      <Link href={`/asset/${e.id}`} className="text-ink underline-offset-4 hover:text-hivis hover:underline">
+                      <Link href={`/equipment/${e.id}`} className="text-ink underline-offset-4 hover:text-hivis hover:underline">
                         {e.code}
                       </Link>
                     </td>

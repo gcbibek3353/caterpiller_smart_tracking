@@ -40,5 +40,13 @@ export const BookingListQuery = Pagination.extend({
   from: IsoDateTime.optional(),
   to: IsoDateTime.optional(),
   overdue: z.coerce.boolean().optional(),
+  /**
+   * "Due back within N days" — the /bookings Upcoming returns tab.
+   *
+   * Deliberately DISJOINT from `overdue`: a booking already past its grace day
+   * is late, not upcoming, so the two filters partition the CHECKED_OUT set
+   * rather than overlapping on the machines that matter most.
+   */
+  returningWithinDays: z.coerce.number().int().min(1).max(90).optional(),
 });
 export type BookingListQuery = z.infer<typeof BookingListQuery>;
