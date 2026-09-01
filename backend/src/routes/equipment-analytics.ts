@@ -7,6 +7,7 @@ import {
   getClientBookingWindow,
   type AuthUser,
 } from "../lib/equipment-access";
+import { num } from "../lib/serialize";
 import { optionalAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 import { BUCKET_SIZES, TIMESERIES_METRICS } from "../shared";
@@ -120,6 +121,26 @@ equipmentAnalytics.get("/:id/summary", async (c) => {
       name: equipment.name,
       type: equipment.type,
       status: equipment.status,
+
+      /**
+       * Identity and spec, for the header of the equipment detail page. It
+       * used to have to fetch GET /api/equipment/:id as well just to draw the
+       * photo and the make/model line — two round trips for one card.
+       * `dailyRate` is a Prisma Decimal, so it goes through `num()` like every
+       * other money field; sending the string makes `rate * days` NaN.
+       */
+      imageUrl: equipment.imageUrl,
+      make: equipment.make,
+      model: equipment.model,
+      year: equipment.year,
+      dailyRate: num(equipment.dailyRate) ?? 0,
+      hourlyRate: num(equipment.hourlyRate),
+      fuelCapacityL: equipment.fuelCapacityL,
+      meterHours: equipment.meterHours,
+      homeLat: equipment.homeLat,
+      homeLng: equipment.homeLng,
+      notes: equipment.notes,
+
       runtimeHours: round(totalRuntime),
       idleHours: round(totalIdle),
       utilizationPct: round(utilizationPct),

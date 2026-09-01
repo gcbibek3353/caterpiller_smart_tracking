@@ -23,3 +23,19 @@ export const isBookingOverdue = (
   endDate: Date,
   now: Date = new Date(),
 ) => status === "CHECKED_OUT" && endDate < overdueCutoff(now);
+
+/**
+ * Whole UTC days from today to the booking's last rental day.
+ * `0` = due back today, `1` = tomorrow, negative = already past.
+ *
+ * Compared date-to-date rather than instant-to-instant, because `endDate` is
+ * midnight UTC of the last rental day: a booking due "today" is 0 days out all
+ * day, not 0.6 at breakfast and 0.1 by evening. Sent on every list row so the
+ * UI can label a return without doing clock arithmetic mid-render — which
+ * React's purity rule forbids, and which is how the two sides drifted apart on
+ * `isOverdue` in the first place.
+ */
+export function daysUntilReturn(endDate: Date, now: Date = new Date()): number {
+  const utcDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return Math.round((utcDay(endDate) - utcDay(now)) / 86_400_000);
+}

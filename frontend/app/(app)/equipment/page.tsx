@@ -10,6 +10,7 @@ import { Plate } from "@/components/ui/plate";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { StatusPill } from "@/components/ui/status";
+import { EquipmentPhoto } from "@/components/equipment/EquipmentPhoto";
 
 const TYPES: EquipmentType[] = [
   "EXCAVATOR", "CRANE", "BULLDOZER", "GRADER",
@@ -126,6 +127,15 @@ export default function BrowseEquipmentPage() {
               className="flex flex-col"
             >
               <div className="flex flex-1 flex-col gap-3">
+                <Link href={`/equipment/${e.id}`} aria-label={`Open ${e.code}`}>
+                  <EquipmentPhoto
+                    src={e.imageUrl}
+                    alt={`${e.code} — ${e.name}`}
+                    type={e.type}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="aspect-[4/3] w-full"
+                  />
+                </Link>
                 <div>
                   <p className="font-display text-2xl font-semibold uppercase leading-none">{e.name}</p>
                   <p className="mt-1 text-[13px] text-mute">
@@ -142,7 +152,7 @@ export default function BrowseEquipmentPage() {
                 <div className="mt-auto flex gap-2 pt-1">
                   <Button onClick={() => setBooking(e)} className="flex-1">Book</Button>
                   <Link
-                    href={`/asset/${e.id}`}
+                    href={`/equipment/${e.id}`}
                     className="stamp rounded-plate border border-line bg-plate px-4 py-2.5 text-[12px] text-ink hover:border-ink"
                   >
                     Details

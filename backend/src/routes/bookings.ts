@@ -5,7 +5,7 @@ import { prisma } from "../db";
 import { badRequest, conflict, notFound, ok } from "../lib/http";
 import { paginated, serializeBooking } from "../lib/serialize";
 import { assertCanSeeBooking, requireAuth, requireRole } from "../middleware/auth";
-import { isBookingOverdue, overdueCutoff } from "../lib/overdue";
+import { daysUntilReturn, isBookingOverdue, overdueCutoff } from "../lib/overdue";
 import { valid, validate } from "../middleware/validate";
 import {
   BookingListQuery,
@@ -236,10 +236,23 @@ bookingRoutes.get("/", validate("query", BookingListQuery), async (c) => {
     where.endDate = { ...(where.endDate as object), lt: overdueCutoff() };
   }
 
+  /**
+   * Still out, not yet late, and due back inside the window. Only CHECKED_OUT
+   * counts: a machine that never left the yard cannot be returned, which is the
+   * same rule `detectUpcomingReturn` applies.
+   */
+  if (q.returningWithinDays) {
+    const horizon = new Date(Date.now() + q.returningWithinDays * 86_400_000);
+    where.status = "CHECKED_OUT";
+    where.endDate = { ...(where.endDate as object), gte: overdueCutoff(), lte: horizon };
+  }
+
   const [rows, total] = await Promise.all([
     prisma.booking.findMany({
       where,
-      orderBy: [{ startDate: "desc" }],
+      // Soonest-due first when answering "what is coming back?" — a list of
+      // imminent returns sorted by when the hire STARTED is just noise.
+      orderBy: q.returningWithinDays ? [{ endDate: "asc" }] : [{ startDate: "desc" }],
       skip: (q.page - 1) * q.limit,
       take: q.limit,
       include: {
@@ -258,6 +271,8 @@ bookingRoutes.get("/", validate("query", BookingListQuery), async (c) => {
   const items = rows.map(({ qrToken: _qrToken, ...b }) => ({
     ...serializeBooking(b),
     isOverdue: isBookingOverdue(b.status, b.endDate),
+    // Only meaningful while the machine is actually out.
+    daysUntilReturn: b.status === "CHECKED_OUT" ? daysUntilReturn(b.endDate) : null,
   }));
   return ok(c, paginated(items, total, q.page, q.limit));
 });

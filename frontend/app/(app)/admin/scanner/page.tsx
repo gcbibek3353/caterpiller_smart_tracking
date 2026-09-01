@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { TextArea } from "@/components/ui/textarea";
 import { StatusPill } from "@/components/ui/status";
+import { EquipmentPhoto } from "@/components/equipment/EquipmentPhoto";
 import { CameraScanner } from "@/components/scan/CameraScanner";
 
 /**
@@ -194,6 +195,16 @@ function Refused({
 
 function BookingIdentity({ booking }: { booking: BookingWithRelations }) {
   return (
+    <>
+      {/* Staff check the picture against the machine in front of them before
+          committing — that is the whole point of the two-step scan. */}
+      <EquipmentPhoto
+        src={booking.equipment?.imageUrl}
+        alt={`${booking.equipment?.code} — ${booking.equipment?.name}`}
+        type={booking.equipment?.type}
+        sizes="(max-width: 1024px) 100vw, 400px"
+        className="mb-3 aspect-[16/9] w-full"
+      />
     <PlateRows>
       <PlateRow label="Booking" value={booking.code} />
       <PlateRow
@@ -210,6 +221,7 @@ function BookingIdentity({ booking }: { booking: BookingWithRelations }) {
       <PlateRow label="Operator" value={booking.operator?.name ?? "Not assigned"} mono={false} />
       <PlateRow label="Status" value={<StatusPill status={booking.status} kind="booking" />} mono={false} />
     </PlateRows>
+    </>
   );
 }
 

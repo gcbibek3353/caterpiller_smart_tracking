@@ -143,11 +143,53 @@ full `RENT:v1:` payload or a bare token, so manual entry needs no special casing
 `GET /api/sites?clientId=` · `GET /api/operators?clientId=` — ADMIN only, ignored for a
 CLIENT exactly like `GET /api/bookings?clientId=`.
 
+## ↩️ Upcoming returns
+
+`GET /api/bookings?returningWithinDays=N` — still out, **not yet late**, due back inside N
+days, sorted soonest-first. Drives the *Upcoming returns* tab on `/bookings`.
+
+It is deliberately **disjoint from `?overdue=true`**: the two partition the CHECKED_OUT set
+rather than both claiming the machines that matter most. `test:api:b8` asserts that
+partition, including the case the seed happens not to contain (a genuinely late rental).
+Only CHECKED_OUT counts — a machine that never left the yard cannot be returned, the same
+rule `detectUpcomingReturn` applies.
+
+Every list row now also carries **`daysUntilReturn`** (null unless out): whole UTC days to
+the last rental day, `0` = due today. Server-computed for the same reason `isOverdue` is —
+React's purity rule forbids reading the clock during render, and deriving it per-component
+is exactly how the two sides drifted apart on `isOverdue`.
+
+## 🖼 Fleet photographs
+
+Every machine now carries a real photo. **Sourced from Wikimedia Commons**, openly licensed
+(CC BY / CC BY-SA / CC0), catalogued with licence + author in
+`backend/prisma/equipment-images.ts` — 36 photos across all 9 types, and every URL was
+fetched and confirmed `200 image/*` before being written down.
+
+They are **baked in as literals, not fetched at seed time**: `seed:verify` requires three
+consecutive seeds to produce byte-identical data, which a live search API cannot give.
+The pick is `photoFor(type, code)` — a hash of the machine code, so a machine keeps its
+photo across reseeds and two excavators side by side don't show the same picture. It
+deliberately does **not** draw from `rng`, or adding images would have shifted every
+downstream random draw and silently changed the dataset the demo is tuned against.
+
+```bash
+cd backend && bun run images:backfill     # ~1s, idempotent — no reseed needed
+bun run images:backfill --force           # also replace existing
+```
+Use the backfill rather than `bun run seed` on the shared Neon DB: reseeding wipes 80
+seconds of everyone else's in-flight work to achieve the same thing.
+
+⚠️ `upload.wikimedia.org` must stay listed in `frontend/next.config.ts` under
+`images.remotePatterns` — `next/image` refuses any host that isn't, and the failure is a
+silent broken image.
+
 ## 🌱 The seeded database — what's in it for you
 
 ```bash
 cd backend && bun run seed        # ~80s against Neon, wipes and rebuilds. A only.
 bun run seed:verify               # asserts the data still has real structure (13 checks)
+bun run images:backfill           # give existing machines photos, no reseed (~1s)
 bun run db:restore                # restore prisma/snapshot.sql in ~1s (demo parachute)
 ```
 
@@ -301,7 +343,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **C4** · H3.5–H5 — Ingest + rollup ⛔ *needs A3 ✅* — `POST /api/telemetry/ingest` w/ `x-api-key`, idempotent via `createMany({skipDuplicates:true})` on `@@unique([equipmentId, ts])` *(verified working)*. `services/rollup.ts` upsert on `[equipmentId, date]` *(verified working)*. `POST /api/jobs/rollup` — **now guarded ADMIN-only, it had no auth at all**.
 - [x] **C5** · H5–H6.5 — Simulator wired live + `--scenario` injectors: `idle`, `dead`, `theft`, `siphon`, `overheat`, `offline`. **`theft` is the money shot.**
 - [x] **C6** · H6.5–H8 — Query endpoints: `/timeseries` with **server-side** `date_bin` bucketing (`10m|1h|1d`), `/track`, `/summary`, `/daily` — `routes/equipment-analytics.ts`, mounted at `/api/equipment` and `/api/analytics`.
-- [x] **C7** · H8–H11 — `/asset/[assetId]` sections 1–3 · *done — wired to C6's live endpoints (`/summary`, `/daily`, `/timeseries` ×3, `/track`). Moved from the unauthenticated `app/asset/…` into `app/(app)/asset/…`, so it now gets the AppShell and the session guard; `params` read via `use()` per Next 16. Verified against the reseeded DB: 8 daily rows, 169 hourly points, 1,008 GPS fixes. Fixtures deleted.*
+- [x] **C7** · H8–H11 — `/asset/[assetId]` sections 1–3 · ***route moved:*** *the page is now `/equipment/[equipmentId]`, with `/asset/:id` kept as a real **308 redirect** in `next.config.ts` so steps.md §11 and the demo script still work. The implementation moved intact to `components/asset/EquipmentDetail.tsx` and is unchanged apart from a photo + spec line in the header — one copy, so the two URLs cannot drift. Original note: wired to C6's live endpoints (`/summary`, `/daily`, `/timeseries` ×3, `/track`). Moved from the unauthenticated `app/asset/…` into `app/(app)/asset/…`, so it now gets the AppShell and the session guard; `params` read via `use()` per Next 16. Verified against the reseeded DB: 8 daily rows, 169 hourly points, 1,008 GPS fixes. Fixtures deleted.*
 - [x] **C8** · H11–H12.5 — Leaflet map (section 4) · *done and verified rendering — breadcrumb polyline, dashed site geofence, hi-vis current position. Dropped the marker-404 problem entirely rather than shimming it: `CircleMarker` is SVG, needs no image, and takes design-system colours directly. `ssr:false` dynamic import confirmed load-bearing.*
 - [ ] **C9** · H12.5–H13 — Handoff note: post chart props + map API in chat for B and D
 - [ ] **C10** · H13–H17 — 😴 Sleep
@@ -439,7 +481,7 @@ bun run test:api:b4     # B4  — booking create, overlap rule, role scoping    
 bun run test:api:b5     # B5  — confirm, QR issuance, qr.png                      32
 bun run test:api:b6     # B6  — scan state machine, double-fire guard             44
 bun run test:api:b7     # B7  — response shapes the client booking pages read     40
-bun run test:api:b8     # B8/B9 — shapes the three ADMIN pages read             128
+bun run test:api:b8     # B8/B9 — admin pages, equipment detail, returns tab   173
 ```
 
 **`with-test-db` also forces `MAIL_MODE=console`.** `MAIL_MODE` is `resend` with a live

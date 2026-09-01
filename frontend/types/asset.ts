@@ -64,6 +64,20 @@ export interface EquipmentSummary {
   name: string;
   type: string;
   status: string;
+
+  /** Identity + spec, so the detail header needs no second request. */
+  imageUrl: string | null;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  /** number, not string — the backend converts the Prisma Decimal for us. */
+  dailyRate: number;
+  hourlyRate: number | null;
+  fuelCapacityL: number;
+  meterHours: number;
+  homeLat: number;
+  homeLng: number;
+  notes: string | null;
   runtimeHours: number;
   idleHours: number;
   utilizationPct: number;

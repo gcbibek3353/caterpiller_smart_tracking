@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useApi } from "@/lib/use-api";
 import { api, ApiError } from "@/lib/api";
 import type { Anomaly, AnomalyStatus, Paginated, Severity } from "@/lib/types";
@@ -112,7 +113,14 @@ export default function AdminAnomalies() {
                     <StatusPill status={a.severity} kind="severity" />
                   </td>
                   <td className="px-4 py-3 font-mono text-stamp-lg">{a.type.replace(/_/g, " ")}</td>
-                  <td className="px-4 py-3 font-mono text-stamp-lg text-mute">{a.equipmentId.slice(0, 10)}…</td>
+                  <td className="px-4 py-3 font-mono text-stamp-lg">
+                    <Link
+                      href={`/equipment/${a.equipmentId}`}
+                      className="text-mute underline-offset-4 hover:text-hivis hover:underline"
+                    >
+                      {a.equipmentId.slice(0, 10)}…
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 font-mono text-stamp-lg text-mute">
                     {new Date(a.detectedAt).toLocaleString()}
                   </td>

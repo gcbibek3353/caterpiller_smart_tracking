@@ -16,6 +16,7 @@
     "seed": "bun prisma/seed.ts",
     "seed:fresh": "prisma db push --force-reset --skip-generate && bun prisma/seed.ts",
     "seed:verify": "bun tests/seed.verify.ts",
+    "images:backfill": "bun scripts/backfill-images.ts",
     "test:api": "bun scripts/with-test-db.ts bun tests/a7.api.check.ts",
     "test:api:b4": "bun scripts/with-test-db.ts bun tests/b4.api.check.ts",
     "test:api:b5": "bun scripts/with-test-db.ts bun tests/b5.api.check.ts",

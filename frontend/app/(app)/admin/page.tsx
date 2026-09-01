@@ -104,7 +104,7 @@ export default function FleetOverview() {
                     </p>
                   </div>
                   <Link
-                    href={`/asset/${a.equipmentId}`}
+                    href={`/equipment/${a.equipmentId}`}
                     className="stamp shrink-0 text-stamp-sm text-hivis underline-offset-4 hover:underline"
                   >
                     View →
@@ -130,7 +130,7 @@ export default function FleetOverview() {
                   label={e.type.replace(/_/g, " ")}
                   value={
                     <Link
-                      href={`/asset/${e.id}`}
+                      href={`/equipment/${e.id}`}
                       className="text-hivis underline-offset-4 hover:underline"
                     >
                       {e.code}
