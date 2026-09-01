@@ -22,7 +22,7 @@
 
 | Who | Task | Why it's unblocked |
 |---|---|---|
-| **B** | **B2 — QR camera spike** | Zero deps. **Do this first, this hour.** A camera blocked at H20 kills the demo. |
+| **B** | B2 — QR camera spike | 🔨 *Page built & merged — **only the real-phone HTTPS test is left.** Until that runs, the H20 risk is not actually retired.* |
 | **B** | B3 — booking UI on fixtures | Zero deps; build against JSON fixtures |
 | **C** | C2 — simulator physics (pure fn → stdout) | Zero deps, no DB, no HTTP |
 | **C** | C3 — chart components on fixtures | Zero deps |
@@ -168,7 +168,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 # Person B — Bookings, QR & Booking UX
 
 - [ ] **B1** · H0–H0.75 — Contract workshop
-- [ ] **B2** · H0.75–H2 — **QR camera spike. DO THIS FIRST.** ⛔ *no deps* — `qr-scanner` (nimiq), `next dev --experimental-https`, **open it on a real phone over LAN right now.** `@zxing/browser` is the fallback.
+- [~] **B2** · H0.75–H2 — **QR camera spike** · *B — code merged to `main` (`b4696f4`): `frontend/app/spike/scan/page.tsx`. `qr-scanner` (nimiq) decoding, **manual code-entry input beside the camera from day one**, secure-context banner that shows `isSecureContext`/`mediaDevices` so a blocked camera can't be mistaken for a permissions bug, and a commented-out `@zxing/browser` fallback with the swap note inline. `bun run build` + `lint` clean; page prerenders (scanner is dynamic-imported, so SSR is safe).* **⚠️ Still missing: the phone test over LAN HTTPS — which is the entire point of B2.** Command + the `-H` gotcha are in *Environment quick start*. **Teammates: `bun install` in `frontend/` — two new deps.**
 - [ ] **B3** · H2–H3 — Booking UI on fixtures ⛔ *no deps* — browse/filter + booking form against `frontend/fixtures/*.json`
 - [ ] **B4** · H3–H5 — Booking API: `POST /api/bookings` with **overlap validation**, `GET` role-scoped, `GET`/`PATCH /:id` ⛔ *needs A3 ✅ + A4 ✅ — **unblocked***
   > 📐 **The overlap rule is already written and tested** in `GET /api/equipment?availableFrom=&availableTo=`
@@ -274,3 +274,22 @@ cd ../frontend && bun install && bun run dev   # :3000
 
 ⚠️ **Postgres is on 5433, not 5432** — `steps.md` §1 says 5432; that port is taken on the
 dev machine. Use the `DATABASE_URL` in `backend/.env.example`.
+
+### Scanner over LAN HTTPS — needed for B2, B9, B10
+
+```bash
+cd frontend
+bun dev --experimental-https -H <your-LAN-IP>   # e.g. 172.20.196.17 — find it with: ipconfig getifaddr en0
+# then on the phone: https://<your-LAN-IP>:3000/spike/scan
+```
+
+⚠️ **The `-H` flag is not optional.** Next only puts `localhost, 127.0.0.1, ::1` in the
+generated cert unless you pass a hostname (`next/dist/lib/mkcert.js` → `createSelfSignedCertificate`),
+so plain `--experimental-https` yields a cert the phone rejects outright. Two more things:
+first run downloads mkcert and **prompts for your Mac password** (`mkcert -install`); and the
+phone will *still* show a cert warning, because that CA is trusted on the Mac only — tap
+through, bypassing still gives a secure context so the camera works. If iOS Safari refuses,
+`cloudflared tunnel --url https://localhost:3000` gives a genuinely trusted cert.
+
+`http://192.168.x.x:3000` will **never** work — `navigator.mediaDevices` is `undefined`
+outside a secure context. The banner on `/spike/scan` tells you which side of that line you're on.
