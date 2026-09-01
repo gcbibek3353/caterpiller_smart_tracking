@@ -12,7 +12,7 @@
     "db:studio": "prisma studio",
     "generate": "prisma generate",
     "seed": "bun prisma/seed.ts",
-    "test:api": "bun tests/a7.api.test.ts",
+    "test:api": "bun tests/a7.api.check.ts",
     "seed:fresh": "prisma db push --force-reset --skip-generate && bun prisma/seed.ts",
     "seed:verify": "bun tests/seed.verify.ts",
     "db:dump": "docker exec rental-postgres pg_dump -U rental -d rental --clean --if-exists > prisma/snapshot.sql",

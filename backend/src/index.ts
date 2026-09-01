@@ -21,7 +21,7 @@ app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: env.CORS_ORIGIN,  // string[] — all allowed dev origins
     credentials: true,
     allowHeaders: ["Content-Type", "Authorization", "x-api-key"],
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],

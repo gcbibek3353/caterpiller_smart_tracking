@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/**
+ * "Data plate" — the visual system for Smart Rental Tracking.
+ *
+ * Every machine in a yard carries a stamped identification plate: condensed
+ * caps, tight label/value pairs, mono serials. That plate is the signature
+ * element here, and the palette is workwear: graphite, steel, concrete dust,
+ * and one hi-vis orange for anything you can act on.
+ *
+ * Accent discipline: orange means "actionable". It is never decorative.
+ * Machine STATE uses the status ramp instead, so a colour always means one thing.
+ */
+@theme {
+  --color-ink: #16181a;
+  --color-steel: #3d4550;
+  --color-mute: #6c7480;
+  --color-line: #d3cfc7;
+  --color-dust: #edebe6;
+  --color-plate: #ffffff;
+
+  --color-hivis: #ff6b1a;
+  --color-hivis-deep: #d8500a;
+
+  /* equipment + severity states — one colour, one meaning */
+  --color-ok: #1f7a5c;
+  --color-warn: #b8860b;
+  --color-alert: #c1272d;
+  --color-busy: #2b5f8a;
+
+  --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
+  --font-sans: var(--font-barlow), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-plate: 2px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-dust);
+  color: var(--color-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Stamped label: the typographic motif that ties the system together. */
+.stamp {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+}
+
+/* Hazard striping — used only on the sign-in plate and destructive edges. */
+.hazard {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--color-ink) 0 8px,
+    var(--color-hivis) 8px 16px
+  );
+}
+
+/* Focus is visible everywhere. This app gets used one-handed on a phone. */
+:focus-visible {
+  outline: 2px solid var(--color-hivis);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
