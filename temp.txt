@@ -1,0 +1,24 @@
+I am working on a new project called smart rental tracking system. 
+
+It has to be available for clients as well as rental providers . 
+
+the main required features are : 
+
+Asset Dashboard : admin should be able to create new assets like Excavator , crane , bulldozer , grader and all . update details , price , availability and all 
+                    client should  be able to see all the assets that they have rented . 
+                    /asset/<assetId> should show the details to both admin and customer . Details should include operator , equipmentId/assetId , type , site in which it is allocated , check-In / check-Out Date , Engine Hours / Day , Idle Hours / Day , Operating Days , (Details like locations/coordinates , running HOurs , Temperature , Fuel and all should be recorded every 10 min) and we should be able to see all these in a proper graph / chart 
+
+Check-In / Check-Out : This should be QR based . Client will book the available euqipments. when client books the euqipment / he/she will get a QR which will be used to check-out the equipment from rental plattform. The Rental Plattform should have a QR scanner which will scan this Qr . check-out -> whenever client takes equipments out of the rental store to his/her site . check-in -> whenever client returns the euqipment to the store 
+
+usage logging : locations , hours on , Temperature , fuel should be captured every 10 min and stored . this will be periodically analyzed for any forcast or anamolies 
+
+Alerts : Upcoming returns , overdues and all will be sent to the the client as well as rental stores . The alert will be sent using email
+
+forecasting : Based on the previous rented datas , we need to forecast what are all the equipments that may have the demand . 
+
+anamolies : idle hours , zero runtime , missing operator , unassigned sites and unusual movements should be tracked and those anamolies should also be emailed to both client and rental store . 
+
+
+
+
+
