@@ -14,6 +14,7 @@ import { anomalyRoutes } from "./routes/anomalies";
 import { forecastRoutes } from "./routes/forecast";
 import { telemetry, jobs } from "./routes/telemetry";
 import { equipmentAnalytics, fleetAnalytics } from "./routes/equipment-analytics";
+import { bookingRoutes } from "./routes/bookings";
 import { startScheduler } from "./jobs/scheduler";
 import { optionalAuth, requireAuth, requireRole } from "./middleware/auth";
 import type { AppEnv } from "./types";
@@ -61,7 +62,7 @@ app.route("/api/equipment", equipmentRoutes); // A7 ✅
 app.route("/api/equipment", equipmentAnalytics); // C4 ✅ — deeper sub-paths, no collision with A7's CRUD
 app.route("/api/sites", siteRoutes); // A7 ✅
 app.route("/api/operators", operatorRoutes); // A7 ✅
-// app.route("/api/bookings",  bookingRoutes);    // B4
+app.route("/api/bookings", bookingRoutes); // B4 ✅
 // app.route("/api/scan",      scanRoutes);       // B6
 app.route("/api/telemetry", telemetry); // C4 ✅ — machine-to-machine, guards itself via x-api-key
 app.use("/api/jobs/*", requireAuth, requireRole("ADMIN")); // rollup trigger had no guard at all
