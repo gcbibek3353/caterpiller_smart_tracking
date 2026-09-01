@@ -103,8 +103,34 @@ check("PATCH still sees OTHER bookings", collides("2026-09-12", "2026-09-15", "s
 // ─────────────────────────────────────────────────────────────────────
 // Part 2 · HTTP, RBAC, persistence
 // ─────────────────────────────────────────────────────────────────────
-const API = "http://localhost:4000";
+// Set by scripts/with-test-db.ts, which also swaps DATABASE_URL for
+// TEST_DATABASE_URL and moves the server to :4001. Defaulting to :4000 keeps a
+// bare `bun tests/b4.api.test.ts` working against a plain `bun run dev`.
+const API = process.env.API_URL ?? "http://localhost:4000";
 const ORIGIN = "http://localhost:3000";
+
+/**
+ * Hard stop before the TRUNCATE below.
+ *
+ * DATABASE_URL normally points at the shared Neon database — four people's live
+ * working data and A8's seed. Truncating it deletes their fixtures and logs the
+ * whole team out. Run this suite through `bun run test:b4`, which routes
+ * DATABASE_URL to local Docker via scripts/with-test-db.ts.
+ *
+ * Checked here rather than left to discipline: the failure is silent, instant
+ * and unrecoverable without the snapshot.
+ */
+const dbHost = (() => {
+  try { return new URL(process.env.DATABASE_URL ?? "").hostname; } catch { return ""; }
+})();
+if (!["localhost", "127.0.0.1", "::1"].includes(dbHost)) {
+  console.error(`\n✘ REFUSING TO RUN — DATABASE_URL points at "${dbHost || "unparseable"}".`);
+  console.error("  This suite TRUNCATEs user, session, Equipment, Site, Operator and Booking.");
+  console.error("  Run it against local Docker instead:\n");
+  console.error("      bun run db:up && bun run test:b4\n");
+  console.error(`  (Part 1 passed: ${pass} assertions, no database touched.)`);
+  process.exit(fail === 0 ? 0 : 1);
+}
 
 const reachable = await fetch(`${API}/health`).then((r) => r.ok).catch(() => false);
 if (!reachable) {

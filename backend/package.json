@@ -17,6 +17,7 @@
     "seed:fresh": "prisma db push --force-reset --skip-generate && bun prisma/seed.ts",
     "seed:verify": "bun tests/seed.verify.ts",
     "test:api": "bun scripts/with-test-db.ts bun tests/a7.api.check.ts",
+    "test:b4": "bun scripts/with-test-db.ts bun tests/b4.api.test.ts",
     "test:api:seed": "bun scripts/with-test-db.ts bun prisma/seed.ts",
     "db:dump": "bun scripts/db-snapshot.ts dump",
     "db:restore": "bun scripts/db-snapshot.ts restore"
