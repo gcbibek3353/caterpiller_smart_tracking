@@ -4,6 +4,10 @@
  *   Terminal 1:  bun run dev
  *   Terminal 2:  bun run test:api
  *
+ * Named `.check.ts`, NOT `.test.ts`, on purpose: it needs a live server, so
+ * letting `bun test` auto-discover it makes the unit-test suite fail for
+ * everyone who happens not to have the API running.
+ *
  * ⚠️  DESTRUCTIVE: truncates users, equipment, sites, operators and bookings.
  * Run it against the local dev database only, never a seeded demo DB you care about.
  *
@@ -25,6 +29,14 @@ const B = new URL("..", import.meta.url).pathname;
 const { prisma } = await import(`${B}/src/db.ts`);
 
 const API = "http://localhost:4000";
+
+// Fail loudly and usefully rather than with a bare connection error.
+try {
+  await fetch(`${API}/health`);
+} catch {
+  console.error(`\n✘ No API at ${API}. Start it first:  bun run dev\n`);
+  process.exit(1);
+}
 const ORIGIN = "http://localhost:3000";
 
 let pass = 0, fail = 0;

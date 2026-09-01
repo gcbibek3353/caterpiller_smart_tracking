@@ -1,10 +1,11 @@
 {
   "name": "backend",
+  "module": "src/index.ts",
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts",
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:push": "prisma db push",
@@ -19,17 +20,17 @@
     "db:restore": "docker exec -i rental-postgres psql -U rental -d rental < prisma/snapshot.sql"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.4.3",
     "@prisma/client": "^6.19.3",
+    "@rental/shared": "workspace:*",
     "better-auth": "^1.7.2",
     "croner": "^10.0.1",
-    "hono": "^4.7.0",
-    "zod": "^3.24.1"
+    "hono": "^4.7.4",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "prisma": "^6.19.3"
-  },
-  "peerDependencies": {
+    "prisma": "^6.19.3",
     "typescript": "^5"
   }
 }

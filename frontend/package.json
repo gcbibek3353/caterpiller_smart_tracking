@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@zxing/browser": "^0.2.1",
+    "better-auth": "^1.7.2",
     "next": "16.3.4",
     "qr-scanner": "^1.4.2",
     "react": "19.2.8",

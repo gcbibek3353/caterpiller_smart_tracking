@@ -12,7 +12,10 @@ import { siteRoutes } from "./routes/sites";
 import { operatorRoutes } from "./routes/operators";
 import { anomalyRoutes } from "./routes/anomalies";
 import { forecastRoutes } from "./routes/forecast";
+import { telemetry, jobs } from "./routes/telemetry";
+import { equipmentAnalytics, fleetAnalytics } from "./routes/equipment-analytics";
 import { startScheduler } from "./jobs/scheduler";
+import { optionalAuth, requireAuth, requireRole } from "./middleware/auth";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -24,7 +27,7 @@ app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: env.CORS_ORIGIN,  // string[] — all allowed dev origins
     credentials: true,
     allowHeaders: ["Content-Type", "Authorization", "x-api-key"],
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
@@ -55,11 +58,15 @@ app.get("/health", async (c) => {
 // ── Route modules mount here as each owner lands them ──
 app.route("/api/auth", authRoutes); // A5 ✅
 app.route("/api/equipment", equipmentRoutes); // A7 ✅
+app.route("/api/equipment", equipmentAnalytics); // C4 ✅ — deeper sub-paths, no collision with A7's CRUD
 app.route("/api/sites", siteRoutes); // A7 ✅
 app.route("/api/operators", operatorRoutes); // A7 ✅
 // app.route("/api/bookings",  bookingRoutes);    // B4
 // app.route("/api/scan",      scanRoutes);       // B6
-// app.route("/api/telemetry", telemetryRoutes);  // C4
+app.route("/api/telemetry", telemetry); // C4 ✅ — machine-to-machine, guards itself via x-api-key
+app.use("/api/jobs/*", requireAuth, requireRole("ADMIN")); // rollup trigger had no guard at all
+app.route("/api/jobs", jobs); // C4 ✅
+app.route("/api/analytics", fleetAnalytics); // C4 ✅
 app.route("/api/anomalies", anomalyRoutes); // D5 ✅
 app.route("/api/forecast", forecastRoutes); // D6 ✅
 

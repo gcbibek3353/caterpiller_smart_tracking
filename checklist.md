@@ -37,7 +37,9 @@
 | **C** | **C7 — asset page charts** | ✅ **Seeded data exists** — 54k ticks, 21 days, real fuel saw-tooth |
 | **D** | **D5 — detector runner** | ✅ Seeded data has **4 real injected faults** to fire on — done, see below |
 | **D** | **D6 — forecast runner** | ✅ 12 months of demand with trend + seasonality to learn — done, see below |
-| **A** | A10 — frontend shell + auth pages | A9 needs C4 first — next on A's list |
+| **A** | **A10 — frontend shell + auth pages** | ✅ Login/register + authenticated `(app)` shell (admin, dashboard) landed on `main` |
+| **D** | **D8/D10 — `/admin/anomalies`, `/alerts`** | ✅ Unblocked — A10 shell/auth exists now |
+| **A** | A11 — deploy | A9 still needs C4 |
 
 ## 🚧 Blocked right now
 
@@ -46,8 +48,7 @@
 | A9 real rollup in seed | C4 (rollup service) |
 | B10 phone scanner re-test | A11 (deploy) |
 | C12 asset timeline | ✅ unblocked — D5 anomalies exist now |
-| D8 `/admin/anomalies`, D10 `/alerts` | A10 (frontend shell/auth — no login page exists to reach an authenticated route yet) |
-| D9 `/admin/forecast` | A10 **and** C3 (chart components) |
+| D9 `/admin/forecast` | C3 (chart components) — A10 is done, this is the only blocker left |
 
 ---
 
@@ -123,6 +124,45 @@ a calendar day or more past it.
 
 ---
 
+## 🎨 The frontend shell — build your pages inside it
+
+```bash
+cd frontend && bun run dev        # :3000   (backend must be on :4000)
+```
+
+Your page goes in `app/(app)/<route>/page.tsx` and inherits the shell — nav,
+auth guard and role routing are already done. Add your route to
+`components/nav-config.ts` and the link lights up.
+
+```tsx
+"use client";
+import { useApi } from "@/lib/use-api";
+import { api } from "@/lib/api";              // api.get/post/patch/delete
+import { Plate, PlateRow, PlateRows } from "@/components/ui/plate";
+import { StatusPill } from "@/components/ui/status";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { useSession } from "@/lib/auth-client";
+
+const { data, error, loading, refetch } = useApi<Paginated<Equipment>>("/api/equipment", { limit: 20 });
+```
+
+`apiFetch` already sets `credentials:"include"`, unwraps `{ data }`, and throws
+`ApiError` (with `.fieldErrors` for 422s) — so you `try/catch` instead of
+checking envelope shapes. Types are in `lib/types.ts`.
+
+**The design system — "data plate".** Machines carry stamped ID plates, so the
+app does too: graphite/steel/concrete-dust, condensed caps for labels
+(`.stamp`), mono for machine data, and **hi-vis orange strictly for things you
+can act on**. Equipment state uses the status ramp instead, so one colour always
+means one thing. Don't introduce new accent colours — use `StatusPill`.
+
+⚠️ **Port 3000 must be free.** If it isn't, Next silently falls back to 3001 and
+every sign-in fails with `INVALID_ORIGIN`. `CORS_ORIGIN` now allows both 3000
+and 3001, but check which port `bun run dev` actually printed.
+
+---
+
 ## Decisions locked in A1 — do not relitigate
 
 | Decision | Value |
@@ -158,7 +198,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **A7** · H4.5–H5.5 — Equipment / Site / Operator CRUD · *`/api/equipment`, `/api/sites`, `/api/operators`. Availability overlap + soft delete + cross-client isolation. **28 API tests pass** — `bun run test:api`.*
 - [x] **A8** · H5.5–H9 — **`prisma/seed.ts`** · ***12.3s** (budget was 90s). 6 users, 40 machines, 639 bookings, 54k ticks, 7.7k DailyUsage, 1.1k check events. **Re-runnable and deterministic** — 3 consecutive runs give byte-identical data. Snapshot committed at `prisma/snapshot.sql` (9.4 MB, restores in 1.1s). 13 structure assertions pass via `bun run seed:verify`.*
 - [ ] **A9** · H9–H9.5 — Swap in C's real rollup for the last 21 days ⛔ *needs C4; skip if late*
-- [ ] **A10** · H9.5–H11 — Frontend shell + auth pages, `authClient`, protected-route wrapper, typed `apiFetch()` with `credentials:'include'`
+- [x] **A10** · H9.5–H11 — Frontend shell + auth pages · *role-aware nav, login + register, protected route, `apiFetch()`, `useApi()`, and the **"data plate" design system**. Verified in a real browser: both roles sign in, a CLIENT hitting `/admin` is bounced to `/dashboard`.*
 - [ ] **A11** · H11–H13 — **Deploy** (budget the full 2h — the cross-origin session cookie is the trap)
 - [ ] **A12** · H13–H17 — 😴 Sleep
 - [ ] **A13** · H17–H20 — Integration lead: merge everyone, drive the walkthrough, own the bug list

@@ -7,7 +7,16 @@ const EnvSchema = z.object({
   BETTER_AUTH_URL: z.string().url().default("http://localhost:4000"),
 
   PORT: z.coerce.number().int().positive().default(4000),
-  CORS_ORIGIN: z.string().url().default("http://localhost:3000"),
+  /**
+   * Comma-separated list. Next falls back to :3001 when :3000 is taken, and a
+   * mismatched origin fails as `INVALID_ORIGIN` at sign-in — a confusing way to
+   * lose an hour. Listing both keeps dev working whatever port Next picks.
+   */
+  CORS_ORIGIN: z
+    .string()
+    .default("http://localhost:3000,http://localhost:3001")
+    .transform((s) => s.split(",").map((o) => o.trim()).filter(Boolean))
+    .pipe(z.array(z.string().url()).min(1)),
 
   INGEST_API_KEY: z.string().min(1),
 
@@ -30,3 +39,10 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 export type Env = typeof env;
+
+/** `env` is parsed once at import time; this just hands back that same object.
+ *  Exists because a few newer files (app.ts, ingest-auth.ts) call `loadEnv()`
+ *  instead of importing the `env` constant directly — keep both working. */
+export function loadEnv(): Env {
+  return env;
+}

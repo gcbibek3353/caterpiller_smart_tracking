@@ -1,0 +1,17 @@
+{
+  "name": "caterpiller-smart-tracking",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "simulator",
+    "shared"
+  ],
+  "scripts": {
+    "dev:backend": "bun run --cwd backend dev",
+    "dev:frontend": "bun run --cwd frontend dev",
+    "dev:simulator": "bun run --cwd simulator start",
+    "sim:print-day": "bun run --cwd simulator print-day",
+    "sim:theft": "bun run --cwd simulator print-day -- --scenario theft"
+  }
+}
