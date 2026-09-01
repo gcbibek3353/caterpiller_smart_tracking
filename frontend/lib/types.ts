@@ -95,3 +95,68 @@ export type Paginated<T> = {
   limit: number;
   pages: number;
 };
+
+/** Catalogue from backend/src/contracts/anomaly.ts's ANOMALY_TYPES. */
+export type AnomalyType =
+  | "HIGH_IDLE" | "ZERO_RUNTIME" | "MISSING_OPERATOR" | "UNASSIGNED_SITE"
+  | "LOW_UTILIZATION" | "FUEL_EFFICIENCY_DRIFT"
+  | "GEOFENCE_BREACH" | "NIGHT_MOVEMENT" | "IMPLAUSIBLE_SPEED" | "POSITION_JUMP"
+  | "FUEL_DROP" | "OVERHEAT" | "TELEMETRY_GAP"
+  | "OVERDUE"
+  | "STATISTICAL_OUTLIER";
+
+export type Anomaly = {
+  id: string;
+  type: AnomalyType;
+  severity: Severity;
+  equipmentId: string;
+  bookingId: string | null;
+  detectedAt: string;
+  windowStart: string;
+  windowEnd: string;
+  metric: string | null;
+  value: number | null;
+  threshold: number | null;
+  message: string;
+  status: AnomalyStatus;
+  dedupeKey: string;
+  notifiedAt: string | null;
+};
+
+export type ForecastModel = "holt-winters" | "seasonal-naive" | "ridge";
+
+export type DemandForecast = {
+  id: string;
+  equipmentType: EquipmentType;
+  /** ISO date (Monday of the forecast week), e.g. "2026-09-07". */
+  periodStart: string;
+  horizonWeek: number;
+  predicted: number;
+  lower: number;
+  upper: number;
+  fleetSize: number;
+  capacity: number;
+  utilization: number;
+  gapUnits: number;
+  model: ForecastModel;
+  mase: number | null;
+  generatedAt: string;
+  /** Rebuilt server-side from the row's own columns — see routes/forecast.ts. */
+  recommendation: string;
+};
+
+export type NotificationStatus = "PENDING" | "SENT" | "FAILED";
+
+export type Notification = {
+  id: string;
+  userId: string;
+  type: string;
+  subject: string;
+  body: string;
+  channel: string;
+  status: NotificationStatus;
+  dedupeKey: string;
+  sentAt: string | null;
+  error: string | null;
+  createdAt: string;
+};

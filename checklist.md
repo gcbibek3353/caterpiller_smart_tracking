@@ -25,7 +25,6 @@
 | **B** | B2 — QR camera spike | 🔨 *Page built & merged — **only the real-phone HTTPS test is left.** Until that runs, the H20 risk is not actually retired.* |
 | **B** | B3 — booking UI on fixtures | Zero deps; build against JSON fixtures |
 | **C** | C2 — simulator physics (pure fn → stdout) | Zero deps, no DB, no HTTP |
-| **C** | C3 — chart components on fixtures | Zero deps |
 | **D** | D2 — `lib/stats.ts` + forecasting | Zero deps, pure functions over arrays |
 | **D** | D3 — anomaly detectors (pure fns) | Zero deps |
 | **B/C/D** | **Anything needing the DB** | ✅ Schema is pushed — `prisma generate` works |
@@ -38,7 +37,9 @@
 | **D** | **D5 — detector runner** | ✅ Seeded data has **4 real injected faults** to fire on — done, see below |
 | **D** | **D6 — forecast runner** | ✅ 12 months of demand with trend + seasonality to learn — done, see below |
 | **A** | **A10 — frontend shell + auth pages** | ✅ Login/register + authenticated `(app)` shell (admin, dashboard) landed on `main` |
-| **D** | **D8/D10 — `/admin/anomalies`, `/alerts`** | ✅ Unblocked — A10 shell/auth exists now |
+| **D** | **D8 — `/admin/anomalies`** | ✅ done, see below |
+| **D** | **D9 — `/admin/forecast`** | ✅ done, see below (built C3's chart primitives too — nobody else had picked them up yet) |
+| **D** | **D10 — `/alerts`** | ✅ done, see below |
 | **A** | A11 — deploy | A9 still needs C4 |
 
 ## 🚧 Blocked right now
@@ -48,7 +49,6 @@
 | A9 real rollup in seed | C4 (rollup service) |
 | B10 phone scanner re-test | A11 (deploy) |
 | C12 asset timeline | ✅ unblocked — D5 anomalies exist now |
-| D9 `/admin/forecast` | C3 (chart components) — A10 is done, this is the only blocker left |
 
 ---
 
@@ -91,6 +91,30 @@ not the string Prisma gives you (`"450" * 2 === NaN` on the frontend). Use
 Browser calls need `credentials: "include"`; state-changing calls need an `Origin` header
 (better-auth rejects `MISSING_OR_NULL_ORIGIN` — this bites curl, never a browser).
 New signups are **always CLIENT** — `role` is `input: false`, so it can't be set from the client.
+
+---
+
+## 📦 What D has shipped that you can import right now
+
+**Endpoints live now:**
+`GET /api/anomalies` (role-scoped, filters: `status`/`severity`/`type`/`equipmentId`/`from`/`to`) ·
+`PATCH /api/anomalies/:id` (`ACKNOWLEDGED`/`RESOLVED`/`FALSE_POSITIVE` — `OPEN` only ever moves forward) ·
+`POST /api/anomalies/run` (ADMIN, manual trigger)
+`GET /api/forecast/demand?weeks=8&type=` (ADMIN) — **now includes a `recommendation` sentence per row**,
+rebuilt server-side from the row's own columns since `DemandForecast` never persisted it ·
+`POST /api/forecast/run` (ADMIN, manual trigger)
+`GET /api/notifications` (ADMIN sees all, CLIENT sees own) — **new**, D10's feed needed it and it didn't exist
+
+**Chart components — `frontend/components/charts/`** (C3, built by D to unblock D9 — nobody else had picked
+it up yet; import barrel is `@/components/charts`):
+`WorkIdleBar` (working vs idle stacked bar) · `TrendLine` + `movingAverage()` (line + N-day moving average) ·
+`FuelArea` (fuel area with refuel markers) · `TempLine` (temp line, 105°C threshold from
+`services/anomaly/config.ts`'s `overheat.maxTempC` — kept in sync manually, no shared package) ·
+`EngineStateRibbon` (CSS flex segments, not a Recharts chart — reads better as a Gantt bar than SVG would) ·
+`ForecastBand` (D9's own — line + shaded prediction interval, the stacked-Area trick since Recharts has no
+native band geometry). All take plain typed props over arrays, same "on fixtures" spirit as the original
+C3 spec — C7/C12 can feed them real endpoint data with no changes needed.
+**Recharts is now a frontend dependency** (`^2.15.0`) — added for these.
 
 ---
 

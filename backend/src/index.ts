@@ -12,6 +12,7 @@ import { siteRoutes } from "./routes/sites";
 import { operatorRoutes } from "./routes/operators";
 import { anomalyRoutes } from "./routes/anomalies";
 import { forecastRoutes } from "./routes/forecast";
+import { notificationRoutes } from "./routes/notifications";
 import { telemetry, jobs } from "./routes/telemetry";
 import { equipmentAnalytics, fleetAnalytics } from "./routes/equipment-analytics";
 import { bookingRoutes } from "./routes/bookings";
@@ -70,6 +71,7 @@ app.route("/api/jobs", jobs); // C4 ✅
 app.route("/api/analytics", fleetAnalytics); // C4 ✅
 app.route("/api/anomalies", anomalyRoutes); // D5 ✅
 app.route("/api/forecast", forecastRoutes); // D6 ✅
+app.route("/api/notifications", notificationRoutes); // D10 ✅ — feed for the /alerts page
 
 // In-process cron: realtime detectors, booking rules, daily detectors,
 // weekly forecast retrain — every one also has a manual POST trigger above.
