@@ -19,12 +19,13 @@
     "test:api": "bun scripts/with-test-db.ts bun tests/a7.api.check.ts",
     "test:api:seed": "bun scripts/with-test-db.ts bun prisma/seed.ts",
     "db:dump": "bun scripts/db-snapshot.ts dump",
-    "db:restore": "bun scripts/db-snapshot.ts restore"
+    "db:restore": "bun scripts/db-snapshot.ts restore",
+    "sim": "bun simulator/src/index.ts",
+    "sim:print-day": "bun simulator/src/print-day.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.3",
     "@prisma/client": "^6.5.0",
-    "@rental/shared": "workspace:*",
     "hono": "^4.7.4",
     "zod": "^3.24.2"
   },

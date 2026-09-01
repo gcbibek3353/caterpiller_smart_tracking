@@ -1,5 +1,5 @@
-import type { Scenario } from "@rental/shared";
-import { SCENARIOS } from "@rental/shared";
+import type { Scenario } from "../../src/shared";
+import { SCENARIOS } from "../../src/shared";
 
 export function parseScenario(arg: string | undefined): Scenario | undefined {
   if (!arg) return undefined;
