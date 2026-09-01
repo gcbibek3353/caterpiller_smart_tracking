@@ -1,8 +1,28 @@
+# Local Postgres — the FALLBACK, not the primary database.
+#
+# Day to day the team works against shared Neon (see .env). This compose file
+# exists for two things, both of which matter:
+#
+#   1. Destructive suites. `test:api` TRUNCATEs; pointing that at shared Neon
+#      logs the whole team out and deletes their work. TEST_DATABASE_URL points
+#      here instead, so you need this running to use them.
+#   2. Demo-day parachute. If the venue wifi dies or Neon cold-starts, restore
+#      prisma/snapshot.sql in here and set DATABASE_URL back to localhost:5433.
+#
+#   bun run db:up
+#
+# Postgres 18 to match Neon's server version — a snapshot dumped from an 18
+# server will not restore into 16. If you have an old pgdata volume from the
+# 16-alpine days it will refuse to start: `docker compose down -v` and re-seed.
+#
+# Adminer was dropped when we moved to Neon: the Neon console covers it, and
+# `bun run db:studio` works against whatever DATABASE_URL points at.
+
 name: rental
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: rental-postgres
     restart: unless-stopped
     environment:
@@ -14,25 +34,16 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Postgres 18's image expects the mount at /var/lib/postgresql, NOT at
+      # .../data — it puts the cluster in a version-named subdirectory so that
+      # `pg_upgrade --link` can work across a mount boundary. Mounting the old
+      # path makes 18 refuse to start with "PostgreSQL data in (unused mount)".
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rental -d rental"]
       interval: 5s
       timeout: 5s
       retries: 10
-
-  adminer:
-    image: adminer:latest
-    container_name: rental-adminer
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "8081:8080"
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
-      ADMINER_DESIGN: dracula
 
 volumes:
   pgdata:

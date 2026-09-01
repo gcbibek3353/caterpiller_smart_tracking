@@ -16,9 +16,43 @@
  * inclusive bounds, these tests are what tells you what you broke.
  */
 const B = new URL("..", import.meta.url).pathname;
+
+/**
+ * Refuse to truncate anything that is not local Postgres.
+ *
+ * The team shares one Neon database. This file TRUNCATEs users, sessions,
+ * equipment, sites, operators and bookings — against Neon that logs all four of
+ * us out and deletes everyone's fixtures mid-work. `bun run test:api` points
+ * DATABASE_URL at TEST_DATABASE_URL for you; this guard is what catches the
+ * other path, where someone runs `bun tests/a7.api.check.ts` directly.
+ */
+{
+  const raw = process.env.DATABASE_URL ?? "";
+  const host = raw ? new URL(raw).hostname : "";
+  const local = ["localhost", "127.0.0.1", "::1"].includes(host);
+  if (!local && process.env.ALLOW_REMOTE_TRUNCATE !== "1") {
+    console.error(`
+✘ REFUSING TO RUN — this suite TRUNCATEs, and DATABASE_URL points at "${host}".
+
+  That is the shared database. Running here would log the whole team out and
+  delete their data.
+
+  Run it against local Postgres instead:
+      bun run db:up
+      bun run dev:test     # terminal 1 — server on the test database
+      bun run test:api     # terminal 2
+
+  If you genuinely mean to wipe a remote database, set ALLOW_REMOTE_TRUNCATE=1.
+`);
+    process.exit(1);
+  }
+}
+
 const { prisma } = await import(`${B}/src/db.ts`);
 
-const API = "http://localhost:4000";
+// Set by scripts/with-test-db.ts, which runs the test stack on 4001 so it cannot
+// collide with a `bun run dev` server already holding 4000 against Neon.
+const API = process.env.API_URL ?? "http://localhost:4000";
 
 // Fail loudly and usefully rather than with a bare connection error.
 try {

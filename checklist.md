@@ -94,8 +94,8 @@ New signups are **always CLIENT** — `role` is `input: false`, so it can't be s
 ## 🌱 The seeded database — what's in it for you
 
 ```bash
-cd backend && bun run seed        # ~12s, wipes and rebuilds. Re-run whenever.
-bun run seed:verify               # asserts the data still has real structure
+cd backend && bun run seed        # ~80s against Neon, wipes and rebuilds. A only.
+bun run seed:verify               # asserts the data still has real structure (13 checks)
 bun run db:restore                # restore prisma/snapshot.sql in ~1s (demo parachute)
 ```
 
@@ -108,7 +108,9 @@ Logins: `admin@rental.com / admin123` · `client@build.com / client123`
 | **D** (anomalies) | **Four faults deliberately injected** so your detectors find real signals: `BLD-0003` overheats to 115 °C · `EXC-0012` idles all day for 5 days · `LDR-0001` 4 days zero runtime · `CRN-0003` fuel siphon. Plus 52 bookings with **no operator** and 39 late returns. |
 | **B** (bookings) | 639 bookings across all 5 statuses. **No machine is ever double-booked** — asserted in `seed:verify`. |
 
-⚠️ **`bun run test:api` truncates the database.** Run it *before* seeding, or re-seed after.
+⚠️ **`bun run test:api` truncates the database** — so it no longer runs against Neon at all.
+It targets local Postgres on :4001 (`bun run db:up` + `bun run dev:test`), and the test file
+hard-refuses any non-localhost `DATABASE_URL`. See *Environment quick start*.
 
 ### 📐 One semantic D needs to decide
 `endDate` is stored at **midnight UTC of the last rental day**, and the availability
@@ -169,8 +171,10 @@ and 3001, but check which port `bun run dev` actually printed.
 | Response envelope | `{ data }` / `{ error: { code, message, details? } }` |
 | Migrations | **None.** `prisma db push` only. |
 | Schema ownership | **Only A edits `prisma/schema.prisma`.** Need a field? Message A. |
-| Postgres host port | **5433**, not 5432 (5432 is taken on the dev machine) |
-| Adminer port | **8081** |
+| **Database** | **Shared Neon cloud Postgres.** One database, all four of us. Ask A for the URLs. |
+| Local Postgres | **:5433**, Postgres **18** (matches Neon). Fallback + destructive tests only. |
+| Adminer | **Dropped.** Use `bun run db:studio` or the Neon console. |
+| Destructive tests | `test:api` runs against **local** on **:4001**, never Neon. Guarded in code. |
 | Repo layout | Backend is **fully self-contained in `backend/`**, incl. `docker-compose.yml` |
 
 ### ✅ Resolved — contracts are duplicated, not shared
@@ -301,18 +305,60 @@ Seed script · manual job triggers · manual QR entry fallback · the `theft` sc
 
 ## Environment quick start
 
+**The team shares ONE cloud Postgres (Neon).** Ask A for `DATABASE_URL` + `DIRECT_URL`;
+they are not committed. Copy `.env.example` → `.env` and paste them in.
+
 ```bash
 cd backend
 bun install
-bun run db:up      # postgres :5433 + adminer :8081
-bun run db:push    # sync schema + prisma generate
+bun run generate   # prisma generate
 bun run dev        # :4000  → curl localhost:4000/health
 
 cd ../frontend && bun install && bun run dev   # :3000
 ```
 
-⚠️ **Postgres is on 5433, not 5432** — `steps.md` §1 says 5432; that port is taken on the
-dev machine. Use the `DATABASE_URL` in `backend/.env.example`.
+You do **not** need Docker for day-to-day work any more. No `db:up`, no `db:push` —
+the schema is already live on Neon and it is seeded.
+
+| Command | What it does |
+|---|---|
+| `bun run dev` | server → **shared Neon** |
+| `bun run seed` | wipes and reseeds **shared Neon** (~80s). Banner names the host first. **A only.** |
+| `bun run seed:verify` | read-only, 13 structure assertions |
+| `bun run db:studio` | browse the data (replaces Adminer, which was dropped) |
+| `bun run db:dump` | Neon → `prisma/snapshot.sql` (~80s) |
+| `bun run db:restore` | `prisma/snapshot.sql` → DB (~1s) — **the demo parachute** |
+| `bun run dev:test` | server → **local** Postgres on **:4001** |
+| `bun run test:api` | 28 destructive API tests → **local**, needs `dev:test` running |
+
+### ⚠️ Destructive commands and the shared database
+
+`test:api` TRUNCATEs users, sessions, equipment, sites, operators and bookings.
+Against Neon that logs all four of us out and deletes everyone's fixtures. So it
+runs against **local Docker Postgres** instead, and a guard in the test file hard-refuses
+any non-localhost `DATABASE_URL` (override only with `ALLOW_REMOTE_TRUNCATE=1`).
+
+```bash
+bun run db:up        # local postgres :5433 — only needed for the tests
+bun run dev:test     # terminal 1 — server on local DB, port 4001
+bun run test:api     # terminal 2
+```
+
+`dev:test` uses **port 4001** deliberately, so it cannot collide with a `bun run dev`
+already holding 4000 against Neon. That collision fails as a baffling
+`P2025 record not found`, not as a port error.
+
+### Neon gotchas, all three hit already
+
+- **Pooled vs direct.** `DATABASE_URL` is the `-pooler` host (the app). `DIRECT_URL` is the
+  same host *without* `-pooler` — `prisma db push` and `pg_dump` need a session-level
+  connection pgbouncer cannot give. Both are in `.env`; the datasource block wires them.
+- **Cold start.** Free-tier Neon suspends compute when idle. The first command after a
+  quiet spell can die mid-flight — the first seed attempt failed with an FK violation
+  halfway through. **Just run it again**; the second run succeeded in 81.7s.
+- **Local Postgres is now 18, not 16**, to match Neon's server — a dump from an 18 server
+  will not restore into 16. If you have an old `pgdata` volume it will crash-loop on start:
+  `docker compose down -v` then `bun run db:restore`.
 
 ### Scanner over LAN HTTPS — needed for B2, B9, B10
 
