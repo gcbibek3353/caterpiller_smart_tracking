@@ -1,30 +1,22 @@
 {
   "name": "backend",
+  "module": "index.ts",
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts",
-    "db:up": "docker compose up -d",
-    "db:down": "docker compose down",
-    "db:push": "prisma db push",
-    "db:reset": "prisma db push --force-reset",
-    "db:studio": "prisma studio",
-    "generate": "prisma generate",
-    "seed": "bun prisma/seed.ts",
-    "test:api": "bun tests/a7.api.test.ts"
+    "dev": "bun run --hot index.ts",
+    "start": "bun run index.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.3",
-    "better-auth": "^1.7.2",
-    "hono": "^4.7.0",
-    "zod": "^3.24.1"
+    "@hono/zod-validator": "^0.4.3",
+    "@prisma/client": "^6.5.0",
+    "@rental/shared": "workspace:*",
+    "hono": "^4.7.4",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "prisma": "^6.19.3"
-  },
-  "peerDependencies": {
+    "prisma": "^6.5.0",
     "typescript": "^5"
   }
 }

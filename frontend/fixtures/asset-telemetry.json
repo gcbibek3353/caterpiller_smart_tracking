@@ -1,0 +1,57 @@
+{
+  "dailyUsage": [
+    { "date": "2026-08-25", "workingHours": 6.2, "idleHours": 1.8, "engineHours": 8.0, "fuelUsedPct": 12, "avgTempC": 87 },
+    { "date": "2026-08-26", "workingHours": 5.5, "idleHours": 2.0, "engineHours": 7.5, "fuelUsedPct": 11, "avgTempC": 88 },
+    { "date": "2026-08-27", "workingHours": 7.0, "idleHours": 1.2, "engineHours": 8.2, "fuelUsedPct": 14, "avgTempC": 89 },
+    { "date": "2026-08-28", "workingHours": 4.8, "idleHours": 2.5, "engineHours": 7.3, "fuelUsedPct": 10, "avgTempC": 86 },
+    { "date": "2026-08-29", "workingHours": 3.2, "idleHours": 1.0, "engineHours": 4.2, "fuelUsedPct": 6, "avgTempC": 84 },
+    { "date": "2026-08-30", "workingHours": 0.5, "idleHours": 0.3, "engineHours": 0.8, "fuelUsedPct": 1, "avgTempC": 75 },
+    { "date": "2026-08-31", "workingHours": 6.8, "idleHours": 1.5, "engineHours": 8.3, "fuelUsedPct": 13, "avgTempC": 88 }
+  ],
+  "fuelSeries": [
+    { "ts": "2026-08-31T06:00:00Z", "fuelPct": 85 },
+    { "ts": "2026-08-31T08:00:00Z", "fuelPct": 82, "isRefuel": false },
+    { "ts": "2026-08-31T10:00:00Z", "fuelPct": 79 },
+    { "ts": "2026-08-31T12:00:00Z", "fuelPct": 76 },
+    { "ts": "2026-08-31T14:00:00Z", "fuelPct": 72 },
+    { "ts": "2026-08-31T16:00:00Z", "fuelPct": 68 },
+    { "ts": "2026-08-31T18:00:00Z", "fuelPct": 10, "isRefuel": false },
+    { "ts": "2026-08-31T18:10:00Z", "fuelPct": 97, "isRefuel": true },
+    { "ts": "2026-08-31T20:00:00Z", "fuelPct": 94 }
+  ],
+  "tempSeries": [
+    { "ts": "2026-08-31T06:00:00Z", "engineTempC": 25, "engineState": "OFF" },
+    { "ts": "2026-08-31T07:00:00Z", "engineTempC": 45, "engineState": "IDLE" },
+    { "ts": "2026-08-31T08:00:00Z", "engineTempC": 70, "engineState": "WORKING" },
+    { "ts": "2026-08-31T10:00:00Z", "engineTempC": 82, "engineState": "WORKING" },
+    { "ts": "2026-08-31T12:00:00Z", "engineTempC": 88, "engineState": "IDLE" },
+    { "ts": "2026-08-31T14:00:00Z", "engineTempC": 90, "engineState": "WORKING" },
+    { "ts": "2026-08-31T16:00:00Z", "engineTempC": 91, "engineState": "WORKING" },
+    { "ts": "2026-08-31T18:00:00Z", "engineTempC": 88, "engineState": "IDLE" },
+    { "ts": "2026-08-31T20:00:00Z", "engineTempC": 40, "engineState": "OFF" }
+  ],
+  "engineStateRibbon": [
+    { "ts": "2026-08-31T00:00:00Z", "engineState": "OFF" },
+    { "ts": "2026-08-31T06:00:00Z", "engineState": "IDLE" },
+    { "ts": "2026-08-31T08:00:00Z", "engineState": "WORKING" },
+    { "ts": "2026-08-31T12:00:00Z", "engineState": "IDLE" },
+    { "ts": "2026-08-31T13:00:00Z", "engineState": "WORKING" },
+    { "ts": "2026-08-31T17:00:00Z", "engineState": "IDLE" },
+    { "ts": "2026-08-31T22:00:00Z", "engineState": "OFF" }
+  ],
+  "track": [
+    { "lat": 12.9716, "lng": 77.5946, "ts": "2026-08-31T08:00:00Z" },
+    { "lat": 12.9718, "lng": 77.5948, "ts": "2026-08-31T10:00:00Z" },
+    { "lat": 12.9720, "lng": 77.5950, "ts": "2026-08-31T12:00:00Z" },
+    { "lat": 12.9722, "lng": 77.5952, "ts": "2026-08-31T14:00:00Z" },
+    { "lat": 12.9725, "lng": 77.5955, "ts": "2026-08-31T16:00:00Z" }
+  ],
+  "geofence": { "lat": 12.9716, "lng": 77.5946, "radiusMeters": 500, "label": "Site S003" },
+  "timeline": [
+    { "id": "1", "ts": "2026-08-31T08:00:00Z", "type": "check", "title": "Equipment checked out", "description": "Operator: Raj Kumar" },
+    { "id": "2", "ts": "2026-08-31T08:20:00Z", "type": "usage", "title": "Usage started", "description": "Engine state: WORKING" },
+    { "id": "3", "ts": "2026-08-31T12:40:00Z", "type": "usage", "title": "High idle detected", "description": "Idle ratio exceeded 30%" },
+    { "id": "4", "ts": "2026-09-01T02:00:00Z", "type": "location", "title": "Location changed", "description": "Equipment left geofence" },
+    { "id": "5", "ts": "2026-09-01T02:20:00Z", "type": "anomaly", "title": "Theft anomaly detected", "description": "GEOFENCE_BREACH", "severity": "HIGH" }
+  ]
+}
