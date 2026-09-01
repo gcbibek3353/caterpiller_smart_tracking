@@ -110,15 +110,46 @@ check("PATCH still sees OTHER bookings", collides("2026-09-12", "2026-09-15", "s
 // ─────────────────────────────────────────────────────────────────────
 // Part 2 · HTTP, RBAC, persistence
 // ─────────────────────────────────────────────────────────────────────
-const API = "http://localhost:4000";
+// Set by scripts/with-test-db.ts, which runs the test stack on 4001 so it
+// cannot collide with a `bun run dev` server already holding 4000 against Neon.
+const API = process.env.API_URL ?? "http://localhost:4000";
 const ORIGIN = "http://localhost:3000";
 
 const reachable = await fetch(`${API}/health`).then((r) => r.ok).catch(() => false);
 if (!reachable) {
   console.log("\n── HTTP tests SKIPPED — API not reachable at " + API + " ──");
-  console.log("   bun run db:up && bun run db:push && bun run dev\n");
+  console.log("   bun run db:up && bun run dev:test\n");
   console.log(`${pass} passed, ${fail} failed  (Part 1 only)`);
   process.exit(fail === 0 ? 0 : 1);
+}
+
+/**
+ * Refuse to truncate anything that is not local Postgres — same guard as
+ * a7.api.check.ts, and the same reason: this file TRUNCATEs, the team shares
+ * one Neon database, and `bun tests/b4.api.check.ts` run directly (bypassing
+ * `bun run test:api:b4` / scripts/with-test-db.ts) is a real path that has
+ * actually hit the shared DB, not just a hypothetical one.
+ */
+{
+  const raw = process.env.DATABASE_URL ?? "";
+  const host = raw ? new URL(raw).hostname : "";
+  const local = ["localhost", "127.0.0.1", "::1"].includes(host);
+  if (!local && process.env.ALLOW_REMOTE_TRUNCATE !== "1") {
+    console.error(`
+✘ REFUSING TO RUN — this suite TRUNCATEs, and DATABASE_URL points at "${host}".
+
+  That is the shared database. Running here would log the whole team out and
+  delete their data.
+
+  Run it against local Postgres instead:
+      bun run db:up
+      bun run dev:test        # terminal 1 — server on the test database
+      bun run test:api:b4     # terminal 2
+
+  If you genuinely mean to wipe a remote database, set ALLOW_REMOTE_TRUNCATE=1.
+`);
+    process.exit(1);
+  }
 }
 
 const { prisma } = await import("../src/db.ts");

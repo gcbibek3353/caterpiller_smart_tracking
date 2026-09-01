@@ -30,6 +30,22 @@ const HISTORY_START = addDays(TODAY, -C.HISTORY_DAYS);
 const FUTURE_END = addDays(TODAY, C.FUTURE_DAYS);
 const TELEMETRY_START = addDays(TODAY, -C.TELEMETRY_DAYS);
 
+/**
+ * Name the target before wiping it. Not a block — seeding shared Neon is the
+ * intended flow and A does it deliberately — but "which database did I just
+ * truncate" should never be a question you have to answer after the fact.
+ */
+function announceTarget() {
+  const raw = process.env.DATABASE_URL ?? "";
+  const host = raw ? new URL(raw).hostname : "(unset)";
+  const local = ["localhost", "127.0.0.1", "::1"].includes(host);
+  console.log(
+    local
+      ? `  seeding LOCAL Postgres (${host})`
+      : `  ⚠  seeding SHARED database — ${host}\n     Every teammate's session and fixtures are about to be replaced.`,
+  );
+}
+
 // ────────────────────────────────────────────────────────────── reset
 async function reset() {
   // TRUNCATE ... CASCADE is one statement and far faster than deleteMany per table.
@@ -469,6 +485,7 @@ async function reconcile(bookings: Awaited<ReturnType<typeof seedBookings>>) {
 // ─────────────────────────────────────────────────────────────── main
 async function main() {
   console.log("\n🌱 Seeding Smart Rental Tracking\n");
+  announceTarget();
   await reset();
   const { clients } = await seedUsers();
   const equipment = await seedEquipment();

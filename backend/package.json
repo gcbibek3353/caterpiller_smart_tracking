@@ -4,8 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run --hot src/index.ts",
-    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "dev:test": "bun scripts/with-test-db.ts bun --watch src/index.ts",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:push": "prisma db push",
@@ -13,12 +14,13 @@
     "db:studio": "prisma studio",
     "generate": "prisma generate",
     "seed": "bun prisma/seed.ts",
-    "test:api": "bun tests/a7.api.check.ts",
-    "test:api:b4": "bun tests/b4.api.check.ts",
     "seed:fresh": "prisma db push --force-reset --skip-generate && bun prisma/seed.ts",
     "seed:verify": "bun tests/seed.verify.ts",
-    "db:dump": "docker exec rental-postgres pg_dump -U rental -d rental --clean --if-exists > prisma/snapshot.sql",
-    "db:restore": "docker exec -i rental-postgres psql -U rental -d rental < prisma/snapshot.sql"
+    "test:api": "bun scripts/with-test-db.ts bun tests/a7.api.check.ts",
+    "test:api:b4": "bun scripts/with-test-db.ts bun tests/b4.api.check.ts",
+    "test:api:seed": "bun scripts/with-test-db.ts bun prisma/seed.ts",
+    "db:dump": "bun scripts/db-snapshot.ts dump",
+    "db:restore": "bun scripts/db-snapshot.ts restore"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.3",

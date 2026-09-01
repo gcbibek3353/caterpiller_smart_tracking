@@ -9,7 +9,11 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Pooled (pgbouncer) endpoint — what the running app uses.
+  url       = env("DATABASE_URL")
+  // Direct endpoint — same host without `-pooler`. `prisma db push`, `migrate`
+  // and `pg_dump` all need a session-level connection that pgbouncer cannot give.
+  directUrl = env("DIRECT_URL")
 }
 
 // ───────────────────────────────────────────────────────────

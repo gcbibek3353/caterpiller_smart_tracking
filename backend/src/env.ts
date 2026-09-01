@@ -1,7 +1,22 @@
 import { z } from "zod";
 
 const EnvSchema = z.object({
+  /** Pooled connection string. This is what the running server uses. */
   DATABASE_URL: z.string().url(),
+  /**
+   * Direct (non-pooled) connection string — the same Neon host without `-pooler`.
+   * Only the Prisma CLI and pg_dump read it; the server never opens it. Optional
+   * so a plain local Postgres, which has no pooler, still boots with one URL set.
+   */
+  DIRECT_URL: z.string().url().optional(),
+  /**
+   * Where DESTRUCTIVE suites point. Defaults to local Docker on purpose: the
+   * shared Neon database is everyone's working data, and `test:api` TRUNCATEs.
+   */
+  TEST_DATABASE_URL: z
+    .string()
+    .url()
+    .default("postgresql://rental:rental@localhost:5433/rental?schema=public"),
 
   BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be >= 32 chars"),
   BETTER_AUTH_URL: z.string().url().default("http://localhost:4000"),
@@ -40,9 +55,13 @@ if (!parsed.success) {
 export const env = parsed.data;
 export type Env = typeof env;
 
-/** `env` is parsed once at import time; this just hands back that same object.
- *  Exists because a few newer files (app.ts, ingest-auth.ts) call `loadEnv()`
- *  instead of importing the `env` constant directly — keep both working. */
-export function loadEnv(): Env {
-  return env;
-}
+/**
+ * Function form of `env`, for the modules written against it
+ * (`middleware/ingest-auth.ts`, `backend/index.ts` — `src/app.ts` was
+ * deleted, its routes mounted straight into `src/index.ts` instead).
+ *
+ * The schema is parsed once at module load, so this is a plain accessor and not
+ * a re-parse. Both forms are supported deliberately: renaming either one would
+ * break the other half of the codebase mid-hackathon.
+ */
+export const loadEnv = (): Env => env;

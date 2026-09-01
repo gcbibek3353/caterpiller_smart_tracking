@@ -6,6 +6,7 @@ import { prisma } from "./db";
 import { ok } from "./lib/http";
 import "./lib/serialize"; // installs the BigInt JSON patch
 import { onError, onNotFound } from "./middleware/error";
+import { requireAuth } from "./middleware/auth";
 import { authRoutes } from "./routes/auth";
 import { equipmentRoutes } from "./routes/equipment";
 import { siteRoutes } from "./routes/sites";
@@ -17,7 +18,7 @@ import { telemetry, jobs } from "./routes/telemetry";
 import { equipmentAnalytics, fleetAnalytics } from "./routes/equipment-analytics";
 import { bookingRoutes } from "./routes/bookings";
 import { startScheduler } from "./jobs/scheduler";
-import { optionalAuth, requireAuth, requireRole } from "./middleware/auth";
+import { requireRole } from "./middleware/auth";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -60,7 +61,10 @@ app.get("/health", async (c) => {
 // ── Route modules mount here as each owner lands them ──
 app.route("/api/auth", authRoutes); // A5 ✅
 app.route("/api/equipment", equipmentRoutes); // A7 ✅
-app.route("/api/equipment", equipmentAnalytics); // C4 ✅ — deeper sub-paths, no collision with A7's CRUD
+// Analytics only defines sub-paths (/:id/summary, /:id/timeseries, /:id/track,
+// /:id/daily), so it shares the /api/equipment prefix with A's CRUD router
+// without shadowing it, and sits behind equipmentRoutes' real requireAuth.
+app.route("/api/equipment", equipmentAnalytics); // C6 ✅
 app.route("/api/sites", siteRoutes); // A7 ✅
 app.route("/api/operators", operatorRoutes); // A7 ✅
 app.route("/api/bookings", bookingRoutes); // B4 ✅
@@ -68,7 +72,11 @@ app.route("/api/bookings", bookingRoutes); // B4 ✅
 app.route("/api/telemetry", telemetry); // C4 ✅ — machine-to-machine, guards itself via x-api-key
 app.use("/api/jobs/*", requireAuth, requireRole("ADMIN")); // rollup trigger had no guard at all
 app.route("/api/jobs", jobs); // C4 ✅
-app.route("/api/analytics", fleetAnalytics); // C4 ✅
+// fleetAnalytics reads c.get("user") and 403s without one, and (unlike
+// equipmentAnalytics) has no CRUD sibling router at this prefix to inherit
+// requireAuth from — needs its own line or even a signed-in ADMIN gets 403.
+app.use("/api/analytics/*", requireAuth);
+app.route("/api/analytics", fleetAnalytics); // C6 ✅
 app.route("/api/anomalies", anomalyRoutes); // D5 ✅
 app.route("/api/forecast", forecastRoutes); // D6 ✅
 app.route("/api/notifications", notificationRoutes); // D10 ✅ — feed for the /alerts page
