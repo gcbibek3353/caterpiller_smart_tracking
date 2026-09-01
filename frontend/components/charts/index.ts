@@ -4,6 +4,8 @@ export { FuelAreaChart } from "./FuelAreaChart";
 export { TemperatureLineChart } from "./TemperatureLineChart";
 export { EngineStateRibbon } from "./EngineStateRibbon";
 export { StatusBar, type StatusSlice } from "./StatusBar";
+export { ForecastRiskBar, type RiskBarPoint } from "./ForecastRiskBar";
+export { AnomalyTrendChart, type AnomalyLike } from "./AnomalyTrendChart";
 
 // D9's forecast primitive — a predicted line with its interval band shaded
 // around it. Different shape of chart from the asset-telemetry set above, so

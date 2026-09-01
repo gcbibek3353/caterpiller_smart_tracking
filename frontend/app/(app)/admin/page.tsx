@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { StatusBar } from "@/components/charts";
+import { AnomalyTrendChart, ForecastRiskBar, StatusBar } from "@/components/charts";
 import { Plate, PlateRow, PlateRows } from "@/components/ui/plate";
 import { StatusPill } from "@/components/ui/status";
 import { formatCurrency, formatDateTime } from "@/lib/design-system";
-import type { Anomaly, Equipment, Paginated } from "@/lib/types";
+import type { Anomaly, DemandForecast, Equipment, Paginated } from "@/lib/types";
 import type { FleetAnalytics } from "@/types/asset";
 import { useApi } from "@/lib/use-api";
 
@@ -26,6 +26,11 @@ export default function FleetOverview() {
     status: "CHECKED_OUT",
     limit: 6,
   });
+  // Company-wide, next week only — the dashboard's window into D9's forecast.
+  const forecast = useApi<DemandForecast[]>("/api/forecast/demand", { weeks: 1, siteId: "company" });
+  // Broad and unfiltered by status — AnomalyTrendChart buckets by detectedAt
+  // itself, so a wider fetch here just gives the trend more days to draw from.
+  const trend = useApi<Paginated<Anomaly>>("/api/anomalies", { limit: 200 });
 
   if (fleet.error) {
     return (
@@ -153,6 +158,17 @@ export default function FleetOverview() {
             />
           </PlateRows>
         </Plate>
+      </div>
+
+      {/* ── forecast risk + anomaly trend ───────────────────────────── */}
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <ForecastRiskBar
+          data={(forecast.data ?? []).map((r) => ({
+            equipmentType: r.equipmentType,
+            utilizationPct: Math.round(r.utilization * 1000) / 10,
+          }))}
+        />
+        <AnomalyTrendChart items={trend.data?.items ?? []} />
       </div>
     </>
   );
