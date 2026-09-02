@@ -22,7 +22,7 @@
 
 | Who | Task | Why it's unblocked |
 |---|---|---|
-| **B** | B2 — QR camera spike | 🔨 *Page built & merged — **only the real-phone HTTPS test is left.** Until that runs, the H20 risk is not actually retired.* |
+| **B** | B2 — QR camera spike | ✅ *Done — page merged **and** scanned from a real phone over LAN HTTPS. The H20 camera risk is retired.* |
 | **B** | B3 — booking UI on fixtures | Zero deps; build against JSON fixtures |
 | **C** | **C2 — simulator physics** | ✅ done — `simulator/src/physics.ts`, merged, never ticked until now |
 | **D** | D2 — `lib/stats.ts` + forecasting | Zero deps, pure functions over arrays |
@@ -41,14 +41,14 @@
 | **D** | **D8 — `/admin/anomalies`** | ✅ done, see below |
 | **D** | **D9 — `/admin/forecast`** | ✅ done, see below (built C3's chart primitives too — nobody else had picked them up yet) |
 | **D** | **D10 — `/alerts`** | ✅ done, see below |
-| **A** | A11 — deploy | A9 still needs C4 · **now also blocks B10, the last unretired demo risk** |
+| **A** | A11 — deploy | A9 still needs C4 · **deployment is off the table for now — B10 no longer waits on it** |
 
 ## 🚧 Blocked right now
 
 | Task | Waiting on |
 |---|---|
 | A9 real rollup in seed | C4 (rollup service) |
-| B10 phone scanner re-test | ~~A11~~ — **unblocked locally via `bun run dev:https`; only the *deployed* re-test still needs A11** |
+| ~~B10 phone scanner re-test~~ | ✅ **done on a real phone via `bun run dev:https`** — the deployed re-test is cut with A11 |
 
 ---
 
@@ -314,7 +314,7 @@ truth — `backend/src/contracts/` wins any disagreement.
 # Person B — Bookings, QR & Booking UX
 
 - [ ] **B1** · H0–H0.75 — Contract workshop
-- [~] **B2** · H0.75–H2 — **QR camera spike** · *B — code merged to `main` (`b4696f4`): `frontend/app/spike/scan/page.tsx`. `qr-scanner` (nimiq) decoding, **manual code-entry input beside the camera from day one**, secure-context banner that shows `isSecureContext`/`mediaDevices` so a blocked camera can't be mistaken for a permissions bug, and a commented-out `@zxing/browser` fallback with the swap note inline. `bun run build` + `lint` clean; page prerenders (scanner is dynamic-imported, so SSR is safe).* **⚠️ The phone test over LAN HTTPS — the entire point of B2 — is now one command (`bun run dev:https`) and everything short of holding a phone is verified. See B10.** Command + the `-H` gotcha are in *Environment quick start*. **Teammates: `bun install` in `frontend/` — two new deps.**
+- [x] **B2** · H0.75–H2 — **QR camera spike** · *B — code merged to `main` (`b4696f4`): `frontend/app/spike/scan/page.tsx`. `qr-scanner` (nimiq) decoding, **manual code-entry input beside the camera from day one**, secure-context banner that shows `isSecureContext`/`mediaDevices` so a blocked camera can't be mistaken for a permissions bug, and a commented-out `@zxing/browser` fallback with the swap note inline. `bun run build` + `lint` clean; page prerenders (scanner is dynamic-imported, so SSR is safe).* **✅ DONE — the phone test over LAN HTTPS, the entire point of B2, has been run on a real phone (`bun run dev:https`) and the QR decoded correctly. The camera risk is retired, not deferred.** Command + the `-H` gotcha are in *Environment quick start*. **Teammates: `bun install` in `frontend/` — two new deps.**
 - [~] **B3** · H2–H3 — Booking UI on fixtures · *superseded — B7 landed straight onto the live API, so the fixture stage was skipped. Nothing outstanding.*
 - [x] **B4** · H3–H5 — Booking API · *B — `POST /api/bookings` with overlap validation, role-scoped `GET`, `GET`/`PATCH /:id`. Overlap semantics reused verbatim from `routes/equipment.ts` (inclusive bounds, blocking = PENDING/CONFIRMED/CHECKED_OUT) so the catalogue and the endpoint cannot disagree. Create runs Serializable + bounded retry, so two requests for one window cannot both win. **`bun run test:api:b4` — 67/67.***
   > 📐 **The overlap rule is already written and tested** in `GET /api/equipment?availableFrom=&availableTo=`
@@ -328,7 +328,8 @@ truth — `backend/src/contracts/` wins any disagreement.
 - [x] **B7** · H8–H10 — Client UI live · *B — `/equipment` (filter + availability window + booking dialog), `/bookings`, `/bookings/[id]` with a large QR. The QR is fetched as a **blob with credentials**, not an `<img src>` — the cookie only rides a cross-origin `<img>` while API and app are same-site, so the naive version works on localhost and breaks on the deploy (B10). **`test:api:b7` — 40/40** pins every field these pages read, since `frontend/lib/types.ts` is hand-duplicated and a rename there is a runtime bug, not a compile error.*
 - [x] **B8** · H10–H12 — Admin bookings table · *`/admin/bookings` — status chips + overdue-only + window filters, confirm / cancel, and a dispatch dialog for site + operator + extending the return date. **Confirm renders the QR inline** from `qrDataUrl`, which `POST /:id/confirm` already returned and nothing was reading — so demo step 1–2 no longer needs curl. Two backend gaps had to close first: `GET /api/sites|/api/operators` had **no `clientId` filter**, so the assign dropdowns would have offered every client's yards at once; and `PATCH /:id` checked only that a site *existed*, not that it belonged to this booking's client — a cross-client dispatch was accepted. Both fixed and pinned.*
 - [x] **B9** · H12–H14 — Admin scanner page for real · *`/admin/scanner` — a four-state machine (idle → preview → committed, plus refused), camera and **manual code entry side by side**, both feeding one path. B2's spike is now `components/scan/CameraScanner.tsx`, restyled onto the plate. Check-in prefills the meter from `lastCheckout` and warns if the new reading is *lower* than the check-out one. The camera **pauses** rather than stops while a preview is up — stopping re-prompts for permission on some phones between every scan. All three refusals (rescan cooldown, PENDING booking, already used) render as readable states, and the PENDING 409's `details.booking` is used to still show what was scanned. Location is opt-in, off by default — no permission prompt mid-demo.* ⚠️ **Still laptop-only — see B10.**
-- [~] **B10** · H14–H15 — Re-test scanner from a phone ⛔ *the deployed run still needs A11* · ***but it no longer has to wait for it.*** `cd frontend && bun run dev:https` serves the app over LAN HTTPS in one command. **Everything up to a human holding a phone is verified** — cert covers the LAN IP, page 200s over TLS, sign-in and an authenticated `/api/equipment` both succeed from `https://<LAN-IP>:3000`. **What is left is literally: pick up a phone, open the URL, scan a QR.** Three traps were found and closed doing this — see below.*
+- [x] **B10** · H14–H15 — Re-test scanner from a phone · ***done — a real phone scanned a real QR over LAN HTTPS and it decoded correctly.*** `cd frontend && bun run dev:https` serves the app in one command: cert covers the LAN IP, page 200s over TLS, sign-in and an authenticated `/api/equipment` both succeed from `https://<LAN-IP>:3000`. **The H20 camera risk — the one steps.md §15 calls the classic demo-day killer — is retired.** Three traps were found and closed getting here; see below, and do not undo them.
+  > **The deployed re-test is cut, not done**, along with A11 — the team is not deploying. If that changes, this item comes back: a different origin means a different cookie path and a fresh camera prompt, and localhost proves nothing about it. **`bun run dev:https` is now the demo path, not just a test tool.***
 - [x] **B11** · H15–H17 — Edge cases · *all four scanner refusals now render as states with a next step rather than a red string: an already-used QR shows **when it was checked in**, a `PENDING` one gets a **Confirm it** button deep-linking to `/admin/bookings?status=PENDING` (the person holding the scanner is the person who can confirm it), cancelled says the client must rebook, and an unknown code says to retype. Overdue badges on both lists now read the server's `isOverdue` instead of re-deriving the rule in two browsers. Refusal panels are **not** hi-vis — DESIGN.md rule 1, the accent means actionable, so it goes on the button. 24 assertions in `test:api:b8` cover the used-QR / cancelled / grace-day-boundary paths.*
 - [ ] **B12** · H17–H21 — 😴 Sleep
 - [ ] **B13** · H21–H24 — Rehearsal — B drives demo steps 1–3 and 8
@@ -416,7 +417,7 @@ Seed script · manual job triggers · manual QR entry fallback · the `theft` sc
 ## Demo running order — rehearse at H22 and H23.5
 
 - [x] 1–2 · **B** — client books an excavator → admin confirms → QR issued, email visible in `/alerts` · *end to end in the UI now — Confirm on `/admin/bookings` shows the QR inline and says whether the mail sent*
-- [~] 3 · **B** — scan the QR off a laptop screen with a phone → preview → meter + fuel → `CHECKED_OUT` · *page done (B9); **the phone-over-HTTPS run is still outstanding** — B2/B10*
+- [x] 3 · **B** — scan the QR off a laptop screen with a phone → preview → meter + fuel → `CHECKED_OUT` · *page done (B9) **and run on a real phone over LAN HTTPS** (B2/B10). Drive the demo with `bun run dev:https`, not `bun run dev` — the camera needs the secure context.*
 - [ ] 4 · **C** — `/asset/<id>`, charts + Leaflet breadcrumb moving live at 60×
 - [ ] 5 · **C→D** — `--scenario theft` → breach + night movement on the board, HIGH email **within 20s**. *This is the moment that sells it.*
 - [ ] 6 · **C** — 21-day range: idle-vs-working bars, fuel saw-tooth, temp threshold line
