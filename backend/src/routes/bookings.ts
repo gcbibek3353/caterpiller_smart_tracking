@@ -87,6 +87,44 @@ async function nextBookingCode(tx: Prisma.TransactionClient): Promise<string> {
 const SERIALIZATION_FAILURE = "P2034";
 const UNIQUE_VIOLATION = "P2002";
 
+/**
+ * Existence is not enough: a site or operator belongs to ONE client, and
+ * dispatching machine X to another company's site (or naming their driver)
+ * is a data leak dressed up as a typo. The id has to belong to the client
+ * on this booking.
+ *
+ * Shared by POST and PATCH deliberately. It lived only in PATCH at first, so
+ * a booking could be CREATED with another client's yard and only refused when
+ * someone later edited it — the two halves of the same rule disagreeing is
+ * exactly how the hole got in.
+ */
+async function assertAssignable(
+  clientId: string,
+  siteId?: string | null,
+  operatorId?: string | null,
+): Promise<void> {
+  if (siteId) {
+    const site = await prisma.site.findUnique({
+      where: { id: siteId },
+      select: { clientId: true },
+    });
+    if (!site) throw notFound("Site");
+    if (site.clientId !== clientId) {
+      throw badRequest("That site belongs to a different client than this booking");
+    }
+  }
+  if (operatorId) {
+    const operator = await prisma.operator.findUnique({
+      where: { id: operatorId },
+      select: { clientId: true },
+    });
+    if (!operator) throw notFound("Operator");
+    if (operator.clientId !== clientId) {
+      throw badRequest("That operator belongs to a different client than this booking");
+    }
+  }
+}
+
 // ── POST /api/bookings ────────────────────────────────────────────────
 bookingRoutes.post("/", validate("json", CreateBookingInput), async (c) => {
   const body = valid(c, "json", CreateBookingInput);
@@ -107,13 +145,7 @@ bookingRoutes.post("/", validate("json", CreateBookingInput), async (c) => {
   const client = await prisma.user.findUnique({ where: { id: clientId } });
   if (!client) throw notFound("Client");
 
-  // Optional FKs: fail with a clear message rather than a raw P2003 from the insert.
-  if (body.siteId && !(await prisma.site.findUnique({ where: { id: body.siteId } }))) {
-    throw notFound("Site");
-  }
-  if (body.operatorId && !(await prisma.operator.findUnique({ where: { id: body.operatorId } }))) {
-    throw notFound("Operator");
-  }
+  await assertAssignable(clientId, body.siteId, body.operatorId);
 
   /**
    * The check-then-insert below is a classic race: two requests can both see a
@@ -361,36 +393,12 @@ bookingRoutes.patch(
     const data: Prisma.BookingUpdateInput = {};
     if (body.status) data.status = body.status;
 
-    /**
-     * Existence is not enough: a site or operator belongs to ONE client, and
-     * dispatching machine X to another company's site (or naming their driver)
-     * is a data leak dressed up as a typo. The id has to belong to the client
-     * on this booking.
-     */
+    // A null clears the column: it skips the guard and still disconnects.
+    await assertAssignable(existing.clientId, body.siteId, body.operatorId);
     if (body.siteId !== undefined) {
-      if (body.siteId) {
-        const site = await prisma.site.findUnique({
-          where: { id: body.siteId },
-          select: { clientId: true },
-        });
-        if (!site) throw notFound("Site");
-        if (site.clientId !== existing.clientId) {
-          throw badRequest("That site belongs to a different client than this booking");
-        }
-      }
       data.site = body.siteId ? { connect: { id: body.siteId } } : { disconnect: true };
     }
     if (body.operatorId !== undefined) {
-      if (body.operatorId) {
-        const operator = await prisma.operator.findUnique({
-          where: { id: body.operatorId },
-          select: { clientId: true },
-        });
-        if (!operator) throw notFound("Operator");
-        if (operator.clientId !== existing.clientId) {
-          throw badRequest("That operator belongs to a different client than this booking");
-        }
-      }
       data.operator = body.operatorId ? { connect: { id: body.operatorId } } : { disconnect: true };
     }
 

@@ -153,6 +153,24 @@ check("cross-client site → 400, not silently accepted", r.status === 400, `got
 r = await admin(`/api/bookings/${bookingId}`, { method: "PATCH", body: JSON.stringify({ endDate: "2027-10-07T00:00:00.000Z" }) });
 check("extend the return date → 200", r.status === 200, JSON.stringify(r.body?.error));
 
+console.log("\n── the same rule at CREATE, not just at edit ──");
+// PATCH refused a cross-client site from the start; POST only checked that the
+// id existed, so a booking could be BORN pointing at another company's yard and
+// was only caught if somebody later edited it.
+const foreignOp = await admin("/api/operators", { method: "POST", body: JSON.stringify({ name: "Globex Driver", licenseNo: "LIC-9", clientId: u2.id }) });
+const mkBk = (extra: object) => c1("/api/bookings", { method: "POST", body: JSON.stringify({ equipmentId: eqId, startDate: "2028-01-01T00:00:00.000Z", endDate: "2028-01-05T00:00:00.000Z", ...extra }) });
+
+r = await mkBk({ siteId: foreign.body?.data?.id });
+check("create with another client's SITE → 400", r.status === 400, `got ${r.status}`);
+check("  and says why", /different client/i.test(r.body?.error?.message ?? ""), r.body?.error?.message);
+r = await mkBk({ operatorId: foreignOp.body?.data?.id });
+check("create with another client's OPERATOR → 400", r.status === 400, `got ${r.status}`);
+r = await mkBk({ siteId: "no-such-site" });
+check("a missing site is still a 404, not a 400", r.status === 404, `got ${r.status}`);
+r = await mkBk({ siteId, operatorId: opId });
+check("create with their OWN site + operator → 201", r.status === 201, JSON.stringify(r.body?.error));
+check("  and the booking really carries them", r.body?.data?.siteId === siteId && r.body?.data?.operatorId === opId);
+
 console.log("\n── /admin/bookings: Confirm shows the QR inline ──");
 r = await admin(`/api/bookings/${bookingId}/confirm`, { method: "POST" });
 check("confirm → 200", r.status === 200, JSON.stringify(r.body?.error));
